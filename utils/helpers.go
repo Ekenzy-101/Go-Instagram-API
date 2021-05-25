@@ -33,7 +33,6 @@ func GenerateErrorMessages(errors validator.ValidationErrors) map[string]string 
 
 
 func GetMapKeys(value map[string]string) []string {
-	log.Println(len(value))
 	keys := make([]string, len(value))
 
 	i := 0

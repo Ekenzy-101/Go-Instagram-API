@@ -34,7 +34,6 @@ func Register(c *gin.Context) {
 		messages := utils.GenerateErrorMessages(errors)
 		c.JSON(http.StatusBadRequest, messages)
 		return
-		
 	}
 
 	if err != nil {
@@ -75,16 +74,22 @@ func Login(c *gin.Context) {
 	var body *LoginBody
 	collection := app.GetCollectionHandle(UserCollection)
 
-	if err := c.ShouldBindJSON(&body); err != nil {
-		errors := err.(validator.ValidationErrors)
+	err := c.ShouldBindJSON(&body);
+	errors, ok := err.(validator.ValidationErrors)
+	if ok {
 		messages := utils.GenerateErrorMessages(errors)
 		c.JSON(http.StatusBadRequest, messages)
 		return
 	}
 
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "No body provided"})
+		return
+	}
+
 	user := &models.User{}
 	filter := bson.D{primitive.E{Key: "email", Value: strings.ToLower(body.Email)}}
-	err := collection.FindOne(context.TODO(), filter).Decode(user);
+	err = collection.FindOne(context.TODO(), filter).Decode(user);
 	if err == mongo.ErrNoDocuments {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Email or Password"})
 		return

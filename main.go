@@ -10,7 +10,9 @@ import (
 
 
 func main() {
-	utils.LoadEnvVariables()
+	if os.Getenv("GIN_MODE") != "release" {
+		utils.LoadEnvVariables()
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {

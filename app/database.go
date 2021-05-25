@@ -21,15 +21,16 @@ func CreateDataBaseConnection() (context.Context, context.CancelFunc) {
 	}
 
 	mongoClient = client
-	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30 * time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
+	} else {
+		fmt.Println("Connected to MongoDB!")
 	}
 
-	fmt.Println(CreateIndexes(ctx))
+	CreateIndexes(ctx)
 	
-	fmt.Println("Connected to MongoDB!")
 	return ctx, cancel
 }
 
