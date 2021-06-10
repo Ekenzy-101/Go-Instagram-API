@@ -20,27 +20,27 @@ import (
 
 var (
 	category string
-	content string
-	title string
-	token string
+	content  string
+	title    string
+	token    string
 )
 
-func TestCreatePostSucceedsWithValidInputs(t *testing.T)  {
+func TestCreatePostSucceedsWithValidInputs(t *testing.T) {
 	ctx, cancel := beforeEachCreatePost()
 	defer cancel()
 
 	w := executeCreatePost()
-	
+
 	body := map[string]string{}
 	json.NewDecoder(w.Body).Decode(&body)
-	
+
 	subset := []string{"_id", "content", "category", "title", "userId", "createdAt", "updatedAt"}
-	assert.Equal(t,http.StatusCreated, w.Code)
+	assert.Equal(t, http.StatusCreated, w.Code)
 	assert.Subset(t, utils.GetMapKeys(body), subset)
 
 	afterEachCreatePost(ctx)
 }
-func TestCreatePostFailsWithInvalidInputs(t *testing.T)  {
+func TestCreatePostFailsWithInvalidInputs(t *testing.T) {
 	ctx, cancel := beforeEachCreatePost()
 	defer cancel()
 
@@ -48,38 +48,38 @@ func TestCreatePostFailsWithInvalidInputs(t *testing.T)  {
 	content = ""
 	title = ""
 	w := executeCreatePost()
-	
+
 	body := map[string]string{}
 	json.NewDecoder(w.Body).Decode(&body)
-	
+
 	subset := []string{"content", "category", "title"}
-	assert.Equal(t,http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Subset(t, utils.GetMapKeys(body), subset)
 
 	afterEachCreatePost(ctx)
 }
-func TestCreatePostFailsIfUserIsNotLoggedIn(t *testing.T)  {
+func TestCreatePostFailsIfUserIsNotLoggedIn(t *testing.T) {
 	ctx, cancel := beforeEachCreatePost()
 	defer cancel()
 
 	token = ""
 	w := executeCreatePost()
-	
+
 	body := map[string]string{}
 	json.NewDecoder(w.Body).Decode(&body)
-	
-	assert.Equal(t,http.StatusUnauthorized, w.Code)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
 	assert.Contains(t, body, "message")
 
 	afterEachCreatePost(ctx)
 }
 
-func afterEachCreatePost(ctx context.Context)  {
+func afterEachCreatePost(ctx context.Context) {
 	collection := app.GetCollectionHandle(handlers.PostCollection)
 	collection.DeleteMany(ctx, bson.D{})
 }
 
-func executeCreatePost() *httptest.ResponseRecorder  {
+func executeCreatePost() *httptest.ResponseRecorder {
 	var router = routes.SetupRouter()
 	body := map[string]string{"content": content, "category": category, "title": title}
 	jsonString, _ := json.Marshal(body)
@@ -100,6 +100,6 @@ func beforeEachCreatePost() (context.Context, context.CancelFunc) {
 	title = "Test"
 	user := &models.User{ID: primitive.NewObjectID(), Email: "test@gmail.com"}
 	token, _ = user.GenerateToken()
-	
+
 	return ctx, cancel
 }

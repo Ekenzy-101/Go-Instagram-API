@@ -8,7 +8,6 @@ import (
 	"github.com/Ekenzy-101/Go-Gin-REST-API/utils"
 )
 
-
 func main() {
 	if os.Getenv("GIN_MODE") != "release" {
 		utils.LoadEnvVariables()
@@ -21,8 +20,7 @@ func main() {
 
 	_, cancel := app.CreateDataBaseConnection()
 	defer cancel()
-	
+
 	router := routes.SetupRouter()
 	router.Run(":" + port)
 }
-

@@ -7,7 +7,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-
 type Post struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty" `
 	Category  string             `bson:"category" json:"category,omitempty"  binding:"required"`
@@ -15,9 +14,8 @@ type Post struct {
 	CreatedAt time.Time          `bson:"createdAt" json:"createdAt,omitempty"`
 	Title     string             `bson:"title" json:"title,omitempty"  binding:"required"`
 	UpdatedAt time.Time          `bson:"updatedAt" json:"updatedAt,omitempty"`
-	UserID 		primitive.ObjectID `bson:"userId" json:"userId,omitempty"`
+	UserID    primitive.ObjectID `bson:"userId" json:"userId,omitempty"`
 }
-
 
 func (post *Post) NormalizeFields(withTimestamps bool) {
 	post.Category = strings.TrimSpace(post.Category)

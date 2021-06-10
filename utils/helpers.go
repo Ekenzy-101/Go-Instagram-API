@@ -8,29 +8,28 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func GenerateErrorMessages(errors validator.ValidationErrors) map[string]string  {
+func GenerateErrorMessages(errors validator.ValidationErrors) map[string]string {
 	messages := make(map[string]string)
 
 	for _, err := range errors {
 		field := strings.ToLower(err.Field())
 		tag := err.ActualTag()
-		switch  {
-			case strings.Contains(tag, "required") :
-				messages[field] = err.Field() + " is required"
-			case strings.Contains(tag, "email") :
-				messages[field] = err.Field() + " is not a valid email address"
-			case strings.Contains(tag, "max") :
-				messages[field] = err.Field() + " should be less than " + err.Param() + " characters"
-			case strings.Contains(tag, "min") :
-				messages[field] = err.Field() + " should be up to " + err.Param() + " characters"
-			default:
-				messages[field] = "Field is invalid"
+		switch {
+		case strings.Contains(tag, "required"):
+			messages[field] = err.Field() + " is required"
+		case strings.Contains(tag, "email"):
+			messages[field] = err.Field() + " is not a valid email address"
+		case strings.Contains(tag, "max"):
+			messages[field] = err.Field() + " should be less than " + err.Param() + " characters"
+		case strings.Contains(tag, "min"):
+			messages[field] = err.Field() + " should be up to " + err.Param() + " characters"
+		default:
+			messages[field] = "Field is invalid"
 		}
 	}
 
 	return messages
 }
-
 
 func GetMapKeys(value map[string]string) []string {
 	keys := make([]string, len(value))

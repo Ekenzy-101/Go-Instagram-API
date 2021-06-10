@@ -14,14 +14,14 @@ import (
 
 var mongoClient *mongo.Client
 
-func CreateDataBaseConnection() (context.Context, context.CancelFunc) {	
+func CreateDataBaseConnection() (context.Context, context.CancelFunc) {
 	client, err := mongo.NewClient(options.Client().ApplyURI(os.Getenv("MONGO_URI")))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	mongoClient = client
-	ctx, cancel := context.WithTimeout(context.Background(), 30 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
@@ -30,18 +30,18 @@ func CreateDataBaseConnection() (context.Context, context.CancelFunc) {
 	}
 
 	CreateIndexes(ctx)
-	
+
 	return ctx, cancel
 }
 
-func CreateIndexes(ctx context.Context) (string, error)   {
+func CreateIndexes(ctx context.Context) (string, error) {
 	collection := mongoClient.Database(os.Getenv("MONGODB_NAME")).Collection("users")
 	return collection.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bsonx.Doc{{"email", bsonx.Int32(1)}},
+		Keys:    bsonx.Doc{{Key :"email", Value: bsonx.Int32(1)}},
 		Options: options.Index().SetUnique(true),
 	})
 }
 
-func GetCollectionHandle(name string) *mongo.Collection  {
-	return mongoClient.Database(os.Getenv("MONGODB_NAME")).Collection(name)	
+func GetCollectionHandle(name string) *mongo.Collection {
+	return mongoClient.Database(os.Getenv("MONGODB_NAME")).Collection(name)
 }

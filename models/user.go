@@ -17,7 +17,7 @@ import (
 
 type JwtClaim struct {
 	Email string `json:"email"`
-	ID string `json:"_id"`
+	ID    string `json:"_id"`
 	jwt.StandardClaims
 }
 
@@ -29,12 +29,12 @@ type PasswordConfig struct {
 }
 
 type User struct {
-	ID          primitive.ObjectID	`bson:"_id,omitempty"  json:"_id,omitempty"`
-	CreatedAt   time.Time          	`bson:"createdAt" json:"createdAt,omitempty"`
-	Email       string             	`bson:"email" json:"email,omitempty" binding:"email,max=255"`
-	Name        string             	`bson:"name" json:"name,omitempty" binding:"required,max=50"`
-	Password	  string             	`bson:"password" json:"password,omitempty"  binding:"required,min=6"`
-	UpdatedAt   time.Time          	`bson:"updatedAt" json:"updatedAt,omitempty"`
+	ID        primitive.ObjectID `bson:"_id,omitempty"  json:"_id,omitempty"`
+	CreatedAt time.Time          `bson:"createdAt" json:"createdAt,omitempty"`
+	Email     string             `bson:"email" json:"email,omitempty" binding:"email,max=255"`
+	Name      string             `bson:"name" json:"name,omitempty" binding:"required,max=50"`
+	Password  string             `bson:"password" json:"password,omitempty"  binding:"required,min=6"`
+	UpdatedAt time.Time          `bson:"updatedAt" json:"updatedAt,omitempty"`
 }
 
 func (user *User) ComparePassword(password string) (bool, error) {
@@ -69,7 +69,7 @@ func (user *User) ComparePassword(password string) (bool, error) {
 func (user *User) GenerateToken() (string, error) {
 	claims := &JwtClaim{
 		Email: user.Email,
-		ID : user.ID.Hex(),
+		ID:    user.ID.Hex(),
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Local().Add(time.Hour * time.Duration(1)).Unix(),
 		},

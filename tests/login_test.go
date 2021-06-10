@@ -18,76 +18,76 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func TestLoginSucceedsWithValidInputs(t *testing.T)  {
+func TestLoginSucceedsWithValidInputs(t *testing.T) {
 	ctx, cancel := beforeEachLogin()
 	defer cancel()
 
 	w := executeLogin()
-	
+
 	body := map[string]string{}
 	json.NewDecoder(w.Body).Decode(&body)
-	
+
 	subset := []string{"_id", "name", "email"}
-	assert.Equal(t,http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Subset(t, utils.GetMapKeys(body), subset)
 	assert.Contains(t, w.Result().Header, "Set-Cookie")
 
 	afterEachLogin(ctx)
 }
-func TestLoginFailsWithInvalidInputs(t *testing.T)  {
+func TestLoginFailsWithInvalidInputs(t *testing.T) {
 	ctx, cancel := beforeEachLogin()
 	defer cancel()
 
 	email = strings.Join(make([]string, 247), "a") + "@gmail.com"
 	password = "111"
 	w := executeLogin()
-	
+
 	body := map[string]string{}
 	json.NewDecoder(w.Body).Decode(&body)
-	
+
 	subset := []string{"email", "password"}
-	assert.Equal(t,http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Subset(t, utils.GetMapKeys(body), subset)
 
 	afterEachLogin(ctx)
 }
-func TestLoginFailsIfUserDoesNotExistInDatabase(t *testing.T)  {
+func TestLoginFailsIfUserDoesNotExistInDatabase(t *testing.T) {
 	ctx, cancel := beforeEachLogin()
 	defer cancel()
 
 	email = "doesnotexist@gmail.com"
 	w := executeLogin()
-	
+
 	body := map[string]string{}
 	json.NewDecoder(w.Body).Decode(&body)
-	
-	assert.Equal(t,http.StatusBadRequest, w.Code)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, body, "message")
 
 	afterEachLogin(ctx)
 }
-func TestLoginFailsIfPasswordDoesNotMatch(t *testing.T)  {
+func TestLoginFailsIfPasswordDoesNotMatch(t *testing.T) {
 	ctx, cancel := beforeEachLogin()
 	defer cancel()
 
 	password = "notmatch"
 	w := executeLogin()
-	
+
 	body := map[string]string{}
 	json.NewDecoder(w.Body).Decode(&body)
-	
-	assert.Equal(t,http.StatusBadRequest, w.Code)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, body, "message")
 
 	afterEachLogin(ctx)
 }
 
-func afterEachLogin(ctx context.Context)  {
+func afterEachLogin(ctx context.Context) {
 	collection := app.GetCollectionHandle(handlers.UserCollection)
 	collection.DeleteMany(ctx, bson.D{})
 }
 
-func executeLogin() *httptest.ResponseRecorder  {
+func executeLogin() *httptest.ResponseRecorder {
 	var router = routes.SetupRouter()
 	body := map[string]string{"email": email, "password": password}
 	jsonString, _ := json.Marshal(body)
@@ -105,9 +105,9 @@ func beforeEachLogin() (context.Context, context.CancelFunc) {
 	email = "test@gmail.com"
 	password = "123456"
 	user := models.User{
-		Name : "test",
-		Email: email,
-		Password: password,	
+		Name:     "test",
+		Email:    email,
+		Password: password,
 	}
 	user.HashPassword()
 

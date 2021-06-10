@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 func Authorizer() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := c.Cookie("token")

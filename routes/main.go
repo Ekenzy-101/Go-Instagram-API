@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 func SetupRouter() *gin.Engine {
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
@@ -18,7 +17,7 @@ func SetupRouter() *gin.Engine {
 		AllowHeaders:     []string{"Origin", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
-		MaxAge: 12 * time.Hour,
+		MaxAge:           12 * time.Hour,
 	}))
 
 	authRouter := router.Group("auth")
@@ -28,8 +27,7 @@ func SetupRouter() *gin.Engine {
 		authRouter.POST("/register", handlers.Register)
 	}
 
-	postRouter := router.Group("posts")
-	postRouter.Use(Authorizer())
+	postRouter := router.Group("posts").Use(Authorizer())
 	{
 		postRouter.POST("", handlers.CreatePost)
 		postRouter.DELETE("/:_id", handlers.DeletePost)

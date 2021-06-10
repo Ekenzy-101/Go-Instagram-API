@@ -18,45 +18,45 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestGetPostsSucceedsIfUserIsLoggedIn(t *testing.T)  {
+func TestGetPostsSucceedsIfUserIsLoggedIn(t *testing.T) {
 	ctx, cancel := beforeEachGetPosts()
 	defer cancel()
 
 	w := executeGetPosts()
-	
+
 	body := []map[string]string{}
 	json.NewDecoder(w.Body).Decode(&body)
-	
+
 	subset := []string{"_id", "content", "category", "title", "userId", "createdAt", "updatedAt"}
-	assert.Equal(t,http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Subset(t, utils.GetMapKeys(body[0]), subset)
 	assert.Subset(t, utils.GetMapKeys(body[1]), subset)
 
 	afterEachGetPosts(ctx)
 }
 
-func TestGetPostsFailsIfUserIsNotLoggedIn(t *testing.T)  {
+func TestGetPostsFailsIfUserIsNotLoggedIn(t *testing.T) {
 	ctx, cancel := beforeEachGetPosts()
 	defer cancel()
 
 	token = ""
 	w := executeGetPosts()
-	
+
 	body := map[string]string{}
 	json.NewDecoder(w.Body).Decode(&body)
-	
-	assert.Equal(t,http.StatusUnauthorized, w.Code)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
 	assert.Contains(t, body, "message")
 
 	afterEachGetPosts(ctx)
 }
 
-func afterEachGetPosts(ctx context.Context)  {
+func afterEachGetPosts(ctx context.Context) {
 	collection := app.GetCollectionHandle(handlers.PostCollection)
 	collection.DeleteMany(ctx, bson.D{})
 }
 
-func executeGetPosts() *httptest.ResponseRecorder  {
+func executeGetPosts() *httptest.ResponseRecorder {
 	var router = routes.SetupRouter()
 	body := map[string]string{"content": content, "category": category, "title": title}
 	jsonString, _ := json.Marshal(body)
@@ -75,12 +75,12 @@ func beforeEachGetPosts() (context.Context, context.CancelFunc) {
 
 	user := models.User{ID: primitive.NewObjectID(), Email: "test@gmail.com"}
 	token, _ = user.GenerateToken()
-	
-	post1 := models.Post{ID: primitive.NewObjectID(), Category: "Test", Title: "Test", Content: "Test", UserID: user.ID }
-	post2 := models.Post{ID: primitive.NewObjectID(), Category: "Test", Title: "Test", Content: "Test", UserID: user.ID }
+
+	post1 := models.Post{ID: primitive.NewObjectID(), Category: "Test", Title: "Test", Content: "Test", UserID: user.ID}
+	post2 := models.Post{ID: primitive.NewObjectID(), Category: "Test", Title: "Test", Content: "Test", UserID: user.ID}
 	post1.NormalizeFields(true)
 	post2.NormalizeFields(true)
-	
+
 	collection := app.GetCollectionHandle(handlers.PostCollection)
 	collection.InsertMany(ctx, []interface{}{post1, post2})
 	return ctx, cancel

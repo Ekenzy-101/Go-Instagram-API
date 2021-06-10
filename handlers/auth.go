@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -16,8 +17,8 @@ import (
 )
 
 type LoginBody struct {
-	Email     string `json:"email" binding:"email,max=255"`
-	Password 	string `json:"password" binding:"required,min=6"`
+	Email    string `json:"email" binding:"email,max=255"`
+	Password string `json:"password" binding:"required,min=6"`
 }
 
 const (
@@ -28,7 +29,7 @@ func Register(c *gin.Context) {
 	var user *models.User
 	collection := app.GetCollectionHandle(UserCollection)
 
-	err := c.ShouldBindJSON(&user);
+	err := c.ShouldBindJSON(&user)
 	errors, ok := err.(validator.ValidationErrors)
 	if ok {
 		messages := utils.GenerateErrorMessages(errors)
@@ -43,13 +44,13 @@ func Register(c *gin.Context) {
 
 	user.NormalizeFields(true)
 
-	err = user.HashPassword();
+	err = user.HashPassword()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	res, err := collection.InsertOne(context.TODO(), user);
+	res, err := collection.InsertOne(context.TODO(), user)
 	if mongo.IsDuplicateKeyError(err) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "User already exists"})
 		return
@@ -74,10 +75,11 @@ func Login(c *gin.Context) {
 	var body *LoginBody
 	collection := app.GetCollectionHandle(UserCollection)
 
-	err := c.ShouldBindJSON(&body);
-	errors, ok := err.(validator.ValidationErrors)
-	if ok {
-		messages := utils.GenerateErrorMessages(errors)
+	err := c.ShouldBindJSON(&body)
+	// errors, ok := err.(validator.ValidationErrors)
+	var validationErrors validator.ValidationErrors
+	if errors.As(err, &validationErrors) {
+		messages := utils.GenerateErrorMessages(validationErrors)
 		c.JSON(http.StatusBadRequest, messages)
 		return
 	}
@@ -89,8 +91,8 @@ func Login(c *gin.Context) {
 
 	user := &models.User{}
 	filter := bson.D{primitive.E{Key: "email", Value: strings.ToLower(body.Email)}}
-	err = collection.FindOne(context.TODO(), filter).Decode(user);
-	if err == mongo.ErrNoDocuments {
+	err = collection.FindOne(context.TODO(), filter).Decode(user)
+	if errors.Is(err, mongo.ErrNoDocuments) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Email or Password"})
 		return
 	} else if err != nil {
@@ -107,7 +109,7 @@ func Login(c *gin.Context) {
 	}
 
 	token, err := user.GenerateToken()
-	if  err != nil {
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
@@ -117,6 +119,6 @@ func Login(c *gin.Context) {
 }
 
 func Logout(c *gin.Context) {
-	c.SetCookie("token", "", -1, "/", "",false, true)
+	c.SetCookie("token", "", -1, "/", "", false, true)
 	c.JSON(http.StatusOK, "Success")
 }

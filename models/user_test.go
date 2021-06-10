@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	email = "test@gmail.com"
+	email          = "test@gmail.com"
 	hashedPassword string
-	password = "password"
-	signedToken string
-	userId = primitive.NewObjectID()
+	password       = "password"
+	signedToken    string
+	userId         = primitive.NewObjectID()
 )
 
 func TestHashPassword(t *testing.T) {
@@ -21,7 +21,7 @@ func TestHashPassword(t *testing.T) {
 	}
 	err := user.HashPassword()
 	hashedPassword = user.Password
-	
+
 	assert.NoError(t, err)
 }
 func TestComparePassword(t *testing.T) {
@@ -36,7 +36,7 @@ func TestComparePassword(t *testing.T) {
 func TestGenerateToken(t *testing.T) {
 	user := &User{
 		Email: email,
-		ID: userId,
+		ID:    userId,
 	}
 	token, err := user.GenerateToken()
 	signedToken = token

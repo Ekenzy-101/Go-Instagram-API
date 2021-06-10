@@ -21,7 +21,7 @@ const (
 func CreatePost(c *gin.Context) {
 	var post *models.Post
 	collection := app.GetCollectionHandle(PostCollection)
-	
+
 	user, ok := c.MustGet("user").(*models.JwtClaim)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse decoded token"})
@@ -44,8 +44,8 @@ func CreatePost(c *gin.Context) {
 	post.NormalizeFields(true)
 	post.UserID = userId
 
-	res, err := collection.InsertOne(context.TODO(), post);
-	if  err != nil {
+	res, err := collection.InsertOne(context.TODO(), post)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
@@ -58,7 +58,7 @@ func DeletePost(c *gin.Context) {
 	var post *models.Post
 	_id := c.Param("_id")
 	collection := app.GetCollectionHandle(PostCollection)
-	
+
 	user, ok := c.MustGet("user").(*models.JwtClaim)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse decoded token"})
@@ -72,13 +72,13 @@ func DeletePost(c *gin.Context) {
 	}
 
 	filter := bson.D{
-		primitive.E{Key: "_id", Value: postId}, 
+		primitive.E{Key: "_id", Value: postId},
 	}
 	err = collection.FindOne(context.TODO(), filter).Decode(&post)
 	if err == mongo.ErrNoDocuments {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Post not found"})
 		return
-	} 
+	}
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -88,14 +88,14 @@ func DeletePost(c *gin.Context) {
 	if post.UserID.Hex() != user.ID {
 		c.JSON(http.StatusForbidden, gin.H{"message": "You cannot delete this post"})
 		return
-	} 
+	}
 
 	_, err = collection.DeleteOne(context.TODO(), filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, post)
 }
 
@@ -103,7 +103,7 @@ func GetPost(c *gin.Context) {
 	var post *models.Post
 	_id := c.Param("_id")
 	collection := app.GetCollectionHandle(PostCollection)
-	
+
 	postId, err := primitive.ObjectIDFromHex(_id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid ID"})
@@ -115,8 +115,8 @@ func GetPost(c *gin.Context) {
 	if err == mongo.ErrNoDocuments {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Post not found"})
 		return
-	} 
-	
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
@@ -148,7 +148,7 @@ func GetPosts(c *gin.Context) {
 	c.JSON(http.StatusOK, posts)
 }
 
-func GetUserPosts(c *gin.Context)  {
+func GetUserPosts(c *gin.Context) {
 	posts := []models.Post{}
 	collection := app.GetCollectionHandle(PostCollection)
 
@@ -210,14 +210,14 @@ func UpdatePost(c *gin.Context) {
 	}
 
 	filter := bson.D{
-		primitive.E{Key: "_id", Value: postId}, 
+		primitive.E{Key: "_id", Value: postId},
 	}
 
 	err = collection.FindOne(context.TODO(), filter).Decode(&post)
 	if err == mongo.ErrNoDocuments {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Post not found"})
 		return
-	} 
+	}
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -227,16 +227,16 @@ func UpdatePost(c *gin.Context) {
 	if post.UserID.Hex() != user.ID {
 		c.JSON(http.StatusForbidden, gin.H{"message": "You cannot update this post"})
 		return
-	} 
+	}
 
 	body.NormalizeFields(false)
 
 	update := bson.D{
 		primitive.E{Key: "$set", Value: bson.D{
-				primitive.E{Key: "category", Value: body.Category},
-				primitive.E{Key: "content", Value: body.Content},
-				primitive.E{Key: "title", Value: body.Title},
-			},
+			primitive.E{Key: "category", Value: body.Category},
+			primitive.E{Key: "content", Value: body.Content},
+			primitive.E{Key: "title", Value: body.Title},
+		},
 		},
 	}
 
