@@ -6,20 +6,15 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/dgrijalva/jwt-go"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/argon2"
 )
-
-type JwtClaim struct {
-	Email string `json:"email"`
-	ID    string `json:"_id"`
-	jwt.StandardClaims
-}
 
 type PasswordConfig struct {
 	time    uint32
@@ -29,12 +24,22 @@ type PasswordConfig struct {
 }
 
 type User struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty"  json:"_id,omitempty"`
-	CreatedAt time.Time          `bson:"createdAt" json:"createdAt,omitempty"`
-	Email     string             `bson:"email" json:"email,omitempty" binding:"email,max=255"`
-	Name      string             `bson:"name" json:"name,omitempty" binding:"required,max=50"`
-	Password  string             `bson:"password" json:"password,omitempty"  binding:"required,min=6"`
-	UpdatedAt time.Time          `bson:"updatedAt" json:"updatedAt,omitempty"`
+	ID              primitive.ObjectID `bson:"_id,omitempty"  json:"_id,omitempty"`
+	AccountVerified bool               `bson:"accountVerified" json:"accountVerified"`
+	Bio             string             `bson:"bio" json:"bio"`
+	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt,omitempty"`
+	Email           string             `bson:"email" json:"email,omitempty" binding:"email,max=255"`
+	FollowerCount   int                `bson:"followerCount" json:"followerCount"`
+	FollowingCount  int                `bson:"followingCount" json:"followingCount"`
+	Gender          string             `bson:"gender" json:"gender"`
+	Image           string             `bson:"image" json:"image"`
+	Name            string             `bson:"name" json:"name,omitempty" binding:"required,alpha,max=50"`
+	Password        string             `bson:"password" json:"password,omitempty"  binding:"required,min=6"`
+	PostCount       int                `bson:"postCount" json:"postCount"`
+	Posts           []Post             `bson:"posts" json:"posts"`
+	PhoneNo         string             `bson:"phoneNo" json:"phoneNo,omitempty"`
+	Username        string             `bson:"username" json:"username,omitempty" binding:"username"`
+	Website         string             `bson:"website" json:"website"`
 }
 
 func (user *User) ComparePassword(password string) (bool, error) {
@@ -67,18 +72,20 @@ func (user *User) ComparePassword(password string) (bool, error) {
 }
 
 func (user *User) GenerateToken() (string, error) {
-	claims := &JwtClaim{
+	claims := &services.AccessTokenClaim{
 		Email: user.Email,
 		ID:    user.ID.Hex(),
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Local().Add(time.Hour * time.Duration(1)).Unix(),
+			ExpiresAt: time.Now().Local().Add(time.Second * config.AccessTokenTTLInSeconds).Unix(),
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	signedToken, err := token.SignedString([]byte(os.Getenv("APP_ACCESS_SECRET")))
-	return signedToken, err
+	option := services.JWTOption{
+		SigningMethod: jwt.SigningMethodHS256,
+		Claims:        claims,
+		Secret:        config.AccessTokenSecret,
+	}
+	return services.SignToken(option)
 }
 
 func (user *User) HashPassword() error {
@@ -88,56 +95,26 @@ func (user *User) HashPassword() error {
 		threads: 4,
 		keyLen:  32,
 	}
-
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return err
 	}
 
 	hash := argon2.IDKey([]byte(user.Password), salt, c.time, c.memory, c.threads, c.keyLen)
-
 	b64Salt := base64.RawStdEncoding.EncodeToString(salt)
 	b64Hash := base64.RawStdEncoding.EncodeToString(hash)
-
 	format := "$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s"
 	user.Password = fmt.Sprintf(format, argon2.Version, c.memory, c.time, c.threads, b64Salt, b64Hash)
 
 	return nil
 }
 
-func (user *User) NormalizeFields(withTimestamps bool) {
+func (user *User) NormalizeFields(new bool) {
 	user.Email = strings.ToLower(user.Email)
 	user.Name = strings.TrimSpace(user.Name)
 
-	if withTimestamps {
+	if new {
+		user.ID = primitive.NewObjectID()
 		user.CreatedAt = time.Now()
-		user.UpdatedAt = time.Now()
 	}
-}
-
-func VerifyToken(signedToken string) (claims *JwtClaim, err error) {
-	token, err := jwt.ParseWithClaims(
-		signedToken,
-		&JwtClaim{},
-		func(token *jwt.Token) (interface{}, error) {
-			return []byte(os.Getenv("APP_ACCESS_SECRET")), nil
-		},
-	)
-
-	if err != nil {
-		return
-	}
-
-	claims, ok := token.Claims.(*JwtClaim)
-	if !ok {
-		err = errors.New("couldn't parse claims")
-		return
-	}
-
-	if claims.ExpiresAt < time.Now().Local().Unix() {
-		err = errors.New("JWT is expired")
-		return
-	}
-
-	return
 }

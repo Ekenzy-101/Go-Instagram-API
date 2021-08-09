@@ -3,7 +3,8 @@ package routes
 import (
 	"net/http"
 
-	"github.com/Ekenzy-101/Go-Gin-REST-API/models"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,7 +16,12 @@ func Authorizer() gin.HandlerFunc {
 			return
 		}
 
-		user, err := models.VerifyToken(token)
+		option := services.JWTOption{
+			Secret: config.AccessTokenSecret,
+			Token:  token,
+			Claims: &services.AccessTokenClaim{},
+		}
+		user, err := services.VerifyToken(option)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": err.Error()})
 			return

@@ -4,115 +4,125 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/Ekenzy-101/Go-Gin-REST-API/app"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/handlers"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/helpers"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/models"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/routes"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/utils"
-	"github.com/stretchr/testify/assert"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
+	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func TestLoginSucceedsWithValidInputs(t *testing.T) {
-	ctx, cancel := beforeEachLogin()
-	defer cancel()
-
-	w := executeLogin()
-
-	body := map[string]string{}
-	json.NewDecoder(w.Body).Decode(&body)
-
-	subset := []string{"_id", "name", "email"}
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Subset(t, utils.GetMapKeys(body), subset)
-	assert.Contains(t, w.Result().Header, "Set-Cookie")
-
-	afterEachLogin(ctx)
-}
-func TestLoginFailsWithInvalidInputs(t *testing.T) {
-	ctx, cancel := beforeEachLogin()
-	defer cancel()
-
-	email = strings.Join(make([]string, 247), "a") + "@gmail.com"
-	password = "111"
-	w := executeLogin()
-
-	body := map[string]string{}
-	json.NewDecoder(w.Body).Decode(&body)
-
-	subset := []string{"email", "password"}
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Subset(t, utils.GetMapKeys(body), subset)
-
-	afterEachLogin(ctx)
-}
-func TestLoginFailsIfUserDoesNotExistInDatabase(t *testing.T) {
-	ctx, cancel := beforeEachLogin()
-	defer cancel()
-
-	email = "doesnotexist@gmail.com"
-	w := executeLogin()
-
-	body := map[string]string{}
-	json.NewDecoder(w.Body).Decode(&body)
-
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, body, "message")
-
-	afterEachLogin(ctx)
-}
-func TestLoginFailsIfPasswordDoesNotMatch(t *testing.T) {
-	ctx, cancel := beforeEachLogin()
-	defer cancel()
-
-	password = "notmatch"
-	w := executeLogin()
-
-	body := map[string]string{}
-	json.NewDecoder(w.Body).Decode(&body)
-
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, body, "message")
-
-	afterEachLogin(ctx)
+type LoginTestSuite struct {
+	suite.Suite
+	Email        string
+	Password     string
+	ResponseBody map[string]string
 }
 
-func afterEachLogin(ctx context.Context) {
-	collection := app.GetCollectionHandle(handlers.UserCollection)
-	collection.DeleteMany(ctx, bson.D{})
-}
+func (suite *LoginTestSuite) SetupTest() {
+	services.CreateMongoDBConnection()
+	suite.Email = "test@gmail.com"
+	suite.Password = "123456"
+	suite.ResponseBody = map[string]string{}
 
-func executeLogin() *httptest.ResponseRecorder {
-	var router = routes.SetupRouter()
-	body := map[string]string{"email": email, "password": password}
-	jsonString, _ := json.Marshal(body)
-
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(jsonString))
-	router.ServeHTTP(w, req)
-
-	return w
-}
-
-func beforeEachLogin() (context.Context, context.CancelFunc) {
-	utils.LoadEnvVariables("../.env.test")
-	ctx, cancel := app.CreateDataBaseConnection()
-	email = "test@gmail.com"
-	password = "123456"
 	user := models.User{
 		Name:     "test",
-		Email:    email,
-		Password: password,
+		Email:    suite.Email,
+		Password: suite.Password,
 	}
 	user.HashPassword()
 
-	collection := app.GetCollectionHandle(handlers.UserCollection)
-	collection.InsertOne(ctx, &user)
+	collection := services.GetMongoDBCollection(config.UsersCollection)
+	collection.InsertOne(context.TODO(), &user)
+}
 
-	return ctx, cancel
+func (suite *LoginTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, error) {
+	requestBodyMap := map[string]string{"email": suite.Email, "password": suite.Password}
+	requestBodyBytes, err := json.Marshal(requestBodyMap)
+	if err != nil {
+		return nil, err
+	}
+
+	request, err := http.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(requestBodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	response := httptest.NewRecorder()
+	router := routes.SetupRouter()
+	router.ServeHTTP(response, request)
+	err = json.NewDecoder(response.Body).Decode(&suite.ResponseBody)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (suite *LoginTestSuite) TearDownTest() {
+	collection := services.GetMongoDBCollection(config.UsersCollection)
+	collection.DeleteMany(context.TODO(), bson.D{})
+}
+
+func (suite *LoginTestSuite) Test_Login_SucceedsWithValidInputs() {
+	response, err := suite.ExecuteRequest()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	subset := []string{"_id", "name", "email"}
+
+	suite.Equal(http.StatusOK, response.Code)
+	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
+	suite.Contains(response.Result().Header, "Set-Cookie")
+}
+
+func (suite *LoginTestSuite) Test_Login_FailsWithInvalidInputs() {
+	suite.Email = strings.Join(make([]string, 247), "a") + "@gmail.com"
+	suite.Password = "111"
+
+	response, err := suite.ExecuteRequest()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	subset := []string{"email", "password"}
+
+	suite.Equal(http.StatusBadRequest, response.Code)
+	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
+}
+
+func (suite *LoginTestSuite) Test_Login_FailsIfUserDoesNotExistInDatabase() {
+	suite.Email = "doesnotexist@gmail.com"
+
+	response, err := suite.ExecuteRequest()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	suite.Equal(http.StatusBadRequest, response.Code)
+	suite.Contains(suite.ResponseBody, "message")
+}
+
+func (suite *LoginTestSuite) Test_Login_FailsIfPasswordDoesNotMatch() {
+	suite.Password = "notmatch"
+
+	response, err := suite.ExecuteRequest()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	suite.Equal(http.StatusBadRequest, response.Code)
+	suite.Contains(suite.ResponseBody, "message")
+}
+
+func TestLoginTestSuite(t *testing.T) {
+	suite.Run(t, new(LoginTestSuite))
 }

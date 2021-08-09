@@ -43,10 +43,3 @@ func TestGenerateToken(t *testing.T) {
 
 	assert.NoError(t, err)
 }
-func TestVerifyToken(t *testing.T) {
-	claims, err := VerifyToken(signedToken)
-
-	assert.NoError(t, err)
-	assert.Equal(t, email, claims.Email)
-	assert.Equal(t, userId.Hex(), claims.ID)
-}

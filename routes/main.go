@@ -1,18 +1,25 @@
 package routes
 
 import (
-	"os"
 	"time"
 
+	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/handlers"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/helpers"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
+
+func init() {
+	binding.Validator = &helpers.DefaultValidator{}
+}
 
 func SetupRouter() *gin.Engine {
 	router := gin.Default()
+
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{os.Getenv("CLIENT_ORIGIN")},
+		AllowOrigins:     []string{config.ClientOrigin},
 		AllowMethods:     []string{"PUT", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},

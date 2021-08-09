@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Ekenzy-101/Go-Gin-REST-API/app"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/handlers"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/helpers"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/models"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/routes"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/utils"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -23,8 +23,7 @@ var (
 )
 
 func TestGetPostSucceedsIfUserIsLoggedIn(t *testing.T) {
-	ctx, cancel := beforeEachGetPost()
-	defer cancel()
+	beforeEachGetPost()
 
 	w := executeGetPost()
 
@@ -33,14 +32,13 @@ func TestGetPostSucceedsIfUserIsLoggedIn(t *testing.T) {
 
 	subset := []string{"_id", "content", "category", "title", "userId", "createdAt", "updatedAt"}
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Subset(t, utils.GetMapKeys(body), subset)
+	assert.Subset(t, helpers.GetMapKeys(body), subset)
 
-	afterEachGetPost(ctx)
+	afterEachGetPost()
 }
 
 func TestGetPostFailsIfUserIsNotLoggedIn(t *testing.T) {
-	ctx, cancel := beforeEachGetPost()
-	defer cancel()
+	beforeEachGetPost()
 
 	token = ""
 	w := executeGetPost()
@@ -51,12 +49,11 @@ func TestGetPostFailsIfUserIsNotLoggedIn(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 	assert.Contains(t, body, "message")
 
-	afterEachGetPost(ctx)
+	afterEachGetPost()
 }
 
 func TestGetPostFailsIfPostIdIsInvalid(t *testing.T) {
-	ctx, cancel := beforeEachGetPost()
-	defer cancel()
+	beforeEachGetPost()
 
 	postId = "invalid"
 	w := executeGetPost()
@@ -67,12 +64,11 @@ func TestGetPostFailsIfPostIdIsInvalid(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, strings.ToLower(body["message"]), "invalid")
 
-	afterEachGetPost(ctx)
+	afterEachGetPost()
 }
 
 func TestGetPostFailsIfPostNotFound(t *testing.T) {
-	ctx, cancel := beforeEachGetPost()
-	defer cancel()
+	beforeEachGetPost()
 
 	postId = primitive.NewObjectID().Hex()
 	w := executeGetPost()
@@ -83,12 +79,12 @@ func TestGetPostFailsIfPostNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	assert.Contains(t, strings.ToLower(body["message"]), "not found")
 
-	afterEachGetPost(ctx)
+	afterEachGetPost()
 }
 
-func afterEachGetPost(ctx context.Context) {
-	collection := app.GetCollectionHandle(handlers.PostCollection)
-	collection.DeleteMany(ctx, bson.D{})
+func afterEachGetPost() {
+	collection := services.GetMongoDBCollection(config.UsersCollection)
+	collection.DeleteMany(context.TODO(), bson.D{})
 }
 
 func executeGetPost() *httptest.ResponseRecorder {
@@ -102,9 +98,9 @@ func executeGetPost() *httptest.ResponseRecorder {
 	return w
 }
 
-func beforeEachGetPost() (context.Context, context.CancelFunc) {
-	utils.LoadEnvVariables("../.env.test")
-	ctx, cancel := app.CreateDataBaseConnection()
+func beforeEachGetPost() {
+	helpers.LoadEnvVariables("../.env.test")
+	services.CreateMongoDBConnection()
 
 	user := &models.User{ID: primitive.NewObjectID(), Email: "test@gmail.com"}
 	token, _ = user.GenerateToken()
@@ -113,7 +109,6 @@ func beforeEachGetPost() (context.Context, context.CancelFunc) {
 	post.NormalizeFields(true)
 	postId = post.ID.Hex()
 
-	collection := app.GetCollectionHandle(handlers.PostCollection)
-	collection.InsertOne(ctx, post)
-	return ctx, cancel
+	collection := services.GetMongoDBCollection(config.PostsCollection)
+	collection.InsertOne(context.TODO(), post)
 }

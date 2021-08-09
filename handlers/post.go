@@ -4,9 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/Ekenzy-101/Go-Gin-REST-API/app"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/helpers"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/models"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/utils"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,15 +15,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-const (
-	PostCollection = "posts"
-)
-
 func CreatePost(c *gin.Context) {
 	var post *models.Post
-	collection := app.GetCollectionHandle(PostCollection)
+	collection := services.GetMongoDBCollection(config.PostsCollection)
 
-	user, ok := c.MustGet("user").(*models.JwtClaim)
+	user, ok := c.MustGet("user").(*services.AccessTokenClaim)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse decoded token"})
 		return
@@ -30,7 +27,7 @@ func CreatePost(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&post); err != nil {
 		errors := err.(validator.ValidationErrors)
-		messages := utils.GenerateErrorMessages(errors)
+		messages := helpers.GenerateErrorMessages(errors)
 		c.JSON(http.StatusBadRequest, messages)
 		return
 	}
@@ -57,9 +54,9 @@ func CreatePost(c *gin.Context) {
 func DeletePost(c *gin.Context) {
 	var post *models.Post
 	_id := c.Param("_id")
-	collection := app.GetCollectionHandle(PostCollection)
+	collection := services.GetMongoDBCollection(config.PostsCollection)
 
-	user, ok := c.MustGet("user").(*models.JwtClaim)
+	user, ok := c.MustGet("user").(*services.AccessTokenClaim)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse decoded token"})
 		return
@@ -102,7 +99,7 @@ func DeletePost(c *gin.Context) {
 func GetPost(c *gin.Context) {
 	var post *models.Post
 	_id := c.Param("_id")
-	collection := app.GetCollectionHandle(PostCollection)
+	collection := services.GetMongoDBCollection(config.PostsCollection)
 
 	postId, err := primitive.ObjectIDFromHex(_id)
 	if err != nil {
@@ -126,7 +123,7 @@ func GetPost(c *gin.Context) {
 }
 
 func GetPosts(c *gin.Context) {
-	collection := app.GetCollectionHandle(PostCollection)
+	collection := services.GetMongoDBCollection(config.PostsCollection)
 	posts := []models.Post{}
 
 	cursor, err := collection.Find(context.TODO(), bson.D{})
@@ -150,9 +147,9 @@ func GetPosts(c *gin.Context) {
 
 func GetUserPosts(c *gin.Context) {
 	posts := []models.Post{}
-	collection := app.GetCollectionHandle(PostCollection)
+	collection := services.GetMongoDBCollection(config.PostsCollection)
 
-	user, ok := c.MustGet("user").(*models.JwtClaim)
+	user, ok := c.MustGet("user").(*services.AccessTokenClaim)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse decoded token"})
 		return
@@ -188,8 +185,8 @@ func UpdatePost(c *gin.Context) {
 	var body *models.Post
 	var post *models.Post
 	_id := c.Param("_id")
-	collection := app.GetCollectionHandle(PostCollection)
-	user, ok := c.MustGet("user").(*models.JwtClaim)
+	collection := services.GetMongoDBCollection(config.PostsCollection)
+	user, ok := c.MustGet("user").(*services.AccessTokenClaim)
 
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse decoded token"})
@@ -198,7 +195,7 @@ func UpdatePost(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&body); err != nil {
 		errors := err.(validator.ValidationErrors)
-		messages := utils.GenerateErrorMessages(errors)
+		messages := helpers.GenerateErrorMessages(errors)
 		c.JSON(http.StatusBadRequest, messages)
 		return
 	}

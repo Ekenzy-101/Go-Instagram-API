@@ -8,19 +8,18 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Ekenzy-101/Go-Gin-REST-API/app"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/handlers"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/helpers"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/models"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/routes"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/utils"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestGetPostsSucceedsIfUserIsLoggedIn(t *testing.T) {
-	ctx, cancel := beforeEachGetPosts()
-	defer cancel()
+	beforeEachGetPosts()
 
 	w := executeGetPosts()
 
@@ -29,15 +28,14 @@ func TestGetPostsSucceedsIfUserIsLoggedIn(t *testing.T) {
 
 	subset := []string{"_id", "content", "category", "title", "userId", "createdAt", "updatedAt"}
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Subset(t, utils.GetMapKeys(body[0]), subset)
-	assert.Subset(t, utils.GetMapKeys(body[1]), subset)
+	assert.Subset(t, helpers.GetMapKeys(body[0]), subset)
+	assert.Subset(t, helpers.GetMapKeys(body[1]), subset)
 
-	afterEachGetPosts(ctx)
+	afterEachGetPosts()
 }
 
 func TestGetPostsFailsIfUserIsNotLoggedIn(t *testing.T) {
-	ctx, cancel := beforeEachGetPosts()
-	defer cancel()
+	beforeEachGetPosts()
 
 	token = ""
 	w := executeGetPosts()
@@ -48,12 +46,12 @@ func TestGetPostsFailsIfUserIsNotLoggedIn(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 	assert.Contains(t, body, "message")
 
-	afterEachGetPosts(ctx)
+	afterEachGetPosts()
 }
 
-func afterEachGetPosts(ctx context.Context) {
-	collection := app.GetCollectionHandle(handlers.PostCollection)
-	collection.DeleteMany(ctx, bson.D{})
+func afterEachGetPosts() {
+	collection := services.GetMongoDBCollection(config.PostsCollection)
+	collection.DeleteMany(context.TODO(), bson.D{})
 }
 
 func executeGetPosts() *httptest.ResponseRecorder {
@@ -69,9 +67,8 @@ func executeGetPosts() *httptest.ResponseRecorder {
 	return w
 }
 
-func beforeEachGetPosts() (context.Context, context.CancelFunc) {
-	utils.LoadEnvVariables("../.env.test")
-	ctx, cancel := app.CreateDataBaseConnection()
+func beforeEachGetPosts() {
+	services.CreateMongoDBConnection()
 
 	user := models.User{ID: primitive.NewObjectID(), Email: "test@gmail.com"}
 	token, _ = user.GenerateToken()
@@ -81,7 +78,6 @@ func beforeEachGetPosts() (context.Context, context.CancelFunc) {
 	post1.NormalizeFields(true)
 	post2.NormalizeFields(true)
 
-	collection := app.GetCollectionHandle(handlers.PostCollection)
-	collection.InsertMany(ctx, []interface{}{post1, post2})
-	return ctx, cancel
+	collection := services.GetMongoDBCollection(config.PostsCollection)
+	collection.InsertMany(context.TODO(), []interface{}{post1, post2})
 }

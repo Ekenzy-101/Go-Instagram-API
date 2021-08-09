@@ -4,106 +4,117 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/Ekenzy-101/Go-Gin-REST-API/app"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/handlers"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/helpers"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/models"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/routes"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/utils"
-	"github.com/stretchr/testify/assert"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
+	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 var (
 	email    string
 	password string
-	name     string
 )
 
-func TestRegisterSucceedsWithValidInputs(t *testing.T) {
-	ctx, cancel := beforeEachRegister()
-	defer cancel()
+type RegisterTestSuite struct {
+	suite.Suite
+	Email        string
+	Password     string
+	Name         string
+	ResponseBody map[string]string
+}
 
-	w := executeRegister()
+func (suite *RegisterTestSuite) SetupTest() {
+	services.CreateMongoDBConnection()
+	suite.Email = "test@gmail.com"
+	suite.Password = "123456"
+	suite.Name = "test"
+	suite.ResponseBody = map[string]string{}
+}
 
-	body := map[string]string{}
-	json.NewDecoder(w.Body).Decode(&body)
+func (suite *RegisterTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, error) {
+	requestBodyMap := map[string]interface{}{"email": suite.Email, "password": suite.Password, "name": suite.Name}
+	requestBodyBytes, err := json.Marshal(requestBodyMap)
+	if err != nil {
+		return nil, err
+	}
+
+	request, err := http.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(requestBodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	response := httptest.NewRecorder()
+	router := routes.SetupRouter()
+	router.ServeHTTP(response, request)
+	err = json.NewDecoder(response.Body).Decode(&suite.ResponseBody)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (suite *RegisterTestSuite) TearDownTest() {
+	collection := services.GetMongoDBCollection(config.UsersCollection)
+	collection.DeleteMany(context.TODO(), bson.D{})
+}
+
+func (suite *RegisterTestSuite) Test_Register_SucceedsWithValidInputs() {
+	response, err := suite.ExecuteRequest()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	subset := []string{"_id", "name", "email"}
-	assert.Equal(t, http.StatusCreated, w.Code)
-	assert.Subset(t, utils.GetMapKeys(body), subset)
-	assert.Contains(t, w.Result().Header, "Set-Cookie")
 
-	afterEachRegister(ctx)
+	suite.Equal(http.StatusCreated, response.Code)
+	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
+	suite.Contains(response.Result().Header, "Set-Cookie")
 }
-func TestRegisterFailsWithInvalidInputs(t *testing.T) {
-	ctx, cancel := beforeEachRegister()
-	defer cancel()
 
-	email = strings.Join(make([]string, 247), "a") + "@gmail.com"
-	password = "111"
-	name = ""
-	w := executeRegister()
+func (suite *RegisterTestSuite) Test_Register_FailsWithInvalidInputs() {
+	suite.Email = strings.Repeat("a", 247) + "@gmail.com"
+	suite.Password = "111"
+	suite.Name = ""
 
-	body := map[string]string{}
-	json.NewDecoder(w.Body).Decode(&body)
+	response, err := suite.ExecuteRequest()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	subset := []string{"password", "name", "email"}
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Subset(t, utils.GetMapKeys(body), subset)
 
-	afterEachRegister(ctx)
+	suite.Equal(http.StatusBadRequest, response.Code)
+	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
 }
-func TestRegisterFailsIfUserExistsInDatabase(t *testing.T) {
-	ctx, cancel := beforeEachRegister()
-	defer cancel()
 
+func (suite *RegisterTestSuite) Test_Register_FailsIfUserExistsInDatabase() {
 	user := models.User{
-		Name:     name,
-		Email:    email,
-		Password: password,
+		Name:     suite.Name,
+		Email:    suite.Email,
+		Password: suite.Password,
 	}
-	collection := app.GetCollectionHandle(handlers.UserCollection)
-	collection.InsertOne(ctx, &user)
+	collection := services.GetMongoDBCollection(config.UsersCollection)
+	collection.InsertOne(context.TODO(), user)
 
-	w := executeRegister()
+	response, err := suite.ExecuteRequest()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	body := map[string]string{}
-	json.NewDecoder(w.Body).Decode(&body)
-
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, body, "message")
-
-	afterEachRegister(ctx)
+	suite.Equal(http.StatusBadRequest, response.Code)
+	suite.Contains(suite.ResponseBody, "message")
 }
 
-func afterEachRegister(ctx context.Context) {
-	collection := app.GetCollectionHandle(handlers.UserCollection)
-	collection.DeleteMany(ctx, bson.D{})
-}
-
-func executeRegister() *httptest.ResponseRecorder {
-	var router = routes.SetupRouter()
-	body := map[string]string{"email": email, "password": password, "name": name}
-	jsonString, _ := json.Marshal(body)
-
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(jsonString))
-	router.ServeHTTP(w, req)
-
-	return w
-}
-
-func beforeEachRegister() (context.Context, context.CancelFunc) {
-	utils.LoadEnvVariables("../.env.test")
-	ctx, cancel := app.CreateDataBaseConnection()
-	email = "test@gmail.com"
-	password = "123456"
-	name = "test"
-
-	return ctx, cancel
+func TestRegisterTestSuite(t *testing.T) {
+	suite.Run(t, new(RegisterTestSuite))
 }

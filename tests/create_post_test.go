@@ -8,11 +8,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Ekenzy-101/Go-Gin-REST-API/app"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/handlers"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/helpers"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/models"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/routes"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/utils"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -26,8 +26,7 @@ var (
 )
 
 func TestCreatePostSucceedsWithValidInputs(t *testing.T) {
-	ctx, cancel := beforeEachCreatePost()
-	defer cancel()
+	beforeEachCreatePost()
 
 	w := executeCreatePost()
 
@@ -36,13 +35,12 @@ func TestCreatePostSucceedsWithValidInputs(t *testing.T) {
 
 	subset := []string{"_id", "content", "category", "title", "userId", "createdAt", "updatedAt"}
 	assert.Equal(t, http.StatusCreated, w.Code)
-	assert.Subset(t, utils.GetMapKeys(body), subset)
+	assert.Subset(t, helpers.GetMapKeys(body), subset)
 
-	afterEachCreatePost(ctx)
+	afterEachCreatePost()
 }
 func TestCreatePostFailsWithInvalidInputs(t *testing.T) {
-	ctx, cancel := beforeEachCreatePost()
-	defer cancel()
+	beforeEachCreatePost()
 
 	category = ""
 	content = ""
@@ -52,15 +50,14 @@ func TestCreatePostFailsWithInvalidInputs(t *testing.T) {
 	body := map[string]string{}
 	json.NewDecoder(w.Body).Decode(&body)
 
-	subset := []string{"content", "category", "title"}
+	subset := []string{"category", "title"}
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Subset(t, utils.GetMapKeys(body), subset)
+	assert.Subset(t, helpers.GetMapKeys(body), subset)
 
-	afterEachCreatePost(ctx)
+	afterEachCreatePost()
 }
 func TestCreatePostFailsIfUserIsNotLoggedIn(t *testing.T) {
-	ctx, cancel := beforeEachCreatePost()
-	defer cancel()
+	beforeEachCreatePost()
 
 	token = ""
 	w := executeCreatePost()
@@ -71,12 +68,12 @@ func TestCreatePostFailsIfUserIsNotLoggedIn(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 	assert.Contains(t, body, "message")
 
-	afterEachCreatePost(ctx)
+	afterEachCreatePost()
 }
 
-func afterEachCreatePost(ctx context.Context) {
-	collection := app.GetCollectionHandle(handlers.PostCollection)
-	collection.DeleteMany(ctx, bson.D{})
+func afterEachCreatePost() {
+	collection := services.GetMongoDBCollection(config.PostsCollection)
+	collection.DeleteMany(context.TODO(), bson.D{})
 }
 
 func executeCreatePost() *httptest.ResponseRecorder {
@@ -92,14 +89,13 @@ func executeCreatePost() *httptest.ResponseRecorder {
 	return w
 }
 
-func beforeEachCreatePost() (context.Context, context.CancelFunc) {
-	utils.LoadEnvVariables("../.env.test")
-	ctx, cancel := app.CreateDataBaseConnection()
+func beforeEachCreatePost() {
+	helpers.LoadEnvVariables("../.env.test")
+	services.CreateMongoDBConnection()
 	category = "Test"
 	content = "Test"
 	title = "Test"
 	user := &models.User{ID: primitive.NewObjectID(), Email: "test@gmail.com"}
 	token, _ = user.GenerateToken()
 
-	return ctx, cancel
 }
