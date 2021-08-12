@@ -9,12 +9,15 @@ import (
 )
 
 const (
-	AccessTokenTTLInSeconds = 3600
-	PostsCollection         = "posts"
-	UsersCollection         = "users"
+	AccessTokenCookieName     = "access_token"
+	AccessTokenTTLInSeconds   = 3600
+	PostsCollection           = "posts"
+	PostsLengthInUserDocument = 12
+	UsersCollection           = "users"
 )
 
 var (
+	AWSBucket         string
 	AccessTokenSecret string
 	ClientOrigin      string
 	MongoDBURI        string
@@ -41,6 +44,7 @@ func init() {
 		}
 	}
 
+	AWSBucket = os.Getenv("AWS_BUCKET")
 	AccessTokenSecret = os.Getenv("ACCESS_TOKEN_SECRET")
 	ClientOrigin = os.Getenv("CLIENT_ORIGIN")
 	MongoDBName = os.Getenv("MONGODB_NAME")

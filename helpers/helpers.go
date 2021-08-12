@@ -1,11 +1,10 @@
 package helpers
 
 import (
-	"log"
+	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/joho/godotenv"
 )
 
 func GenerateErrorMessages(errors validator.ValidationErrors) map[string]string {
@@ -15,8 +14,8 @@ func GenerateErrorMessages(errors validator.ValidationErrors) map[string]string 
 		field := err.Field()
 		tag := err.ActualTag()
 		switch tag {
-		case "alpha":
-			messages[field] = strings.Title(field) + " should contain only letters"
+		case "name":
+			messages[field] = strings.Title(field) + " should contain only letters and space"
 		case "email":
 			messages[field] = strings.Title(field) + " is not a valid email address"
 		case "gt":
@@ -41,20 +40,36 @@ func GenerateErrorMessages(errors validator.ValidationErrors) map[string]string 
 	return messages
 }
 
-func GetMapKeys(value map[string]string) []string {
-	keys := make([]string, len(value))
+func GetMapKeys(object interface{}) []string {
+	reflectValue := reflect.ValueOf(object)
+	if reflectValue.Kind() != reflect.Map {
+		panic("value must be a map")
+	}
 
-	i := 0
-	for key := range value {
-		keys[i] = key
-		i++
+	reflectType := reflect.TypeOf(object)
+	if reflectType.Key().Kind() != reflect.String {
+		panic("key must be a string")
+	}
+
+	keys := []string{}
+	for _, key := range reflectValue.MapKeys() {
+		keys = append(keys, key.String())
 	}
 
 	return keys
 }
 
-func LoadEnvVariables(filenames ...string) {
-	if err := godotenv.Load(filenames...); err != nil {
-		log.Fatal(err)
+func GetMapValues(object interface{}) []interface{} {
+	reflectValue := reflect.ValueOf(object)
+	if reflectValue.Kind() != reflect.Map {
+		panic("value must be a map")
 	}
+
+	iter := reflectValue.MapRange()
+	values := []interface{}{}
+	for iter.Next() {
+		values = append(values, iter.Value().Interface())
+	}
+
+	return values
 }

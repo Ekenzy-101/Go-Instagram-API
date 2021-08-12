@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
@@ -11,11 +13,8 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
-func init() {
-	binding.Validator = &helpers.DefaultValidator{}
-}
-
 func SetupRouter() *gin.Engine {
+	binding.Validator = &helpers.DefaultValidator{}
 	router := gin.Default()
 
 	router.Use(cors.New(cors.Config{
@@ -27,6 +26,10 @@ func SetupRouter() *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	router.NoRoute(func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"message": fmt.Sprintf("%v operation is not supported for resource %v", c.Request.Method, c.Request.URL.Path)})
+	})
+
 	authRouter := router.Group("auth")
 	{
 		authRouter.POST("/login", handlers.Login)
@@ -34,14 +37,12 @@ func SetupRouter() *gin.Engine {
 		authRouter.POST("/register", handlers.Register)
 	}
 
-	postRouter := router.Group("posts").Use(Authorizer())
+	postRouter := router.Group("posts")
 	{
-		postRouter.POST("", handlers.CreatePost)
-		postRouter.DELETE("/:_id", handlers.DeletePost)
+		postRouter.POST("", Authorizer(true), handlers.CreatePost)
+		postRouter.DELETE("/:_id", Authorizer(true), handlers.DeletePost)
 		postRouter.GET("/:_id", handlers.GetPost)
-		postRouter.GET("", handlers.GetPosts)
-		postRouter.GET("/me", handlers.GetUserPosts)
-		postRouter.PUT("/:_id", handlers.UpdatePost)
+		postRouter.GET("", Authorizer(false), handlers.GetPosts)
 	}
 
 	return router

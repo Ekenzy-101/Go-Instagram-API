@@ -29,7 +29,9 @@ func CreateMongoDBConnection() {
 	}
 
 	mongoClient = client
-	fmt.Println("Successfully connected and pinged")
+	if !config.IsTesting {
+		fmt.Println("Successfully connected and pinged")
+	}
 
 	createIndexes(ctx)
 }
@@ -38,20 +40,36 @@ func CloseMongoDBConnection() error {
 	return mongoClient.Disconnect(context.TODO())
 }
 
-func createIndexes(ctx context.Context) (string, error) {
-	collection := mongoClient.Database(config.MongoDBName).Collection("users")
-	return collection.Indexes().CreateOne(ctx, mongo.IndexModel{
+func createIndexes(ctx context.Context) ([]string, error) {
+	usersCollection := GetMongoDBCollection(config.UsersCollection)
+	postsCollection := GetMongoDBCollection(config.PostsCollection)
+
+	userModels := []mongo.IndexModel{{
 		Keys:    bsonx.Doc{{Key: "email", Value: bsonx.Int32(1)}},
 		Options: options.Index().SetUnique(true),
-	})
+	},
+		{
+			Keys:    bsonx.Doc{{Key: "username", Value: bsonx.Int32(1)}},
+			Options: options.Index().SetUnique(true),
+		}}
+	userIndexes, err := usersCollection.Indexes().CreateMany(ctx, userModels)
+	if err != nil {
+		return nil, err
+	}
+
+	postModels := []mongo.IndexModel{{
+		Keys:    bsonx.Doc{{Key: "createdAt", Value: bsonx.Int32(1)}},
+		Options: options.Index(),
+	}}
+	postIndexes, err := postsCollection.Indexes().CreateMany(ctx, postModels)
+	if err != nil {
+		return nil, err
+	}
+
+	indexes := append(userIndexes, postIndexes...)
+	return indexes, nil
 }
 
 func GetMongoDBCollection(name string) *mongo.Collection {
 	return mongoClient.Database(config.MongoDBName).Collection(name)
 }
-
-/*
-isDuplicateError()
-isNetworkError()
-isTimeoutError()
-*/

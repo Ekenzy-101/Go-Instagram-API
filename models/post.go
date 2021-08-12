@@ -1,35 +1,73 @@
 package models
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Post struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty" `
-	Category  string             `bson:"category" json:"category,omitempty"  binding:"required"`
-	Content   string             `bson:"content" json:"content,omitempty"  binding:"required"`
-	CreatedAt time.Time          `bson:"createdAt" json:"createdAt,omitempty"`
-	Title     string             `bson:"title" json:"title,omitempty"  binding:"required"`
-	UpdatedAt time.Time          `bson:"updatedAt" json:"updatedAt,omitempty"`
-	UserID    primitive.ObjectID `bson:"userId" json:"userId,omitempty"`
+	ID           primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty" `
+	Images       []string           `bson:"images" json:"images"`
+	Caption      string             `bson:"caption" json:"caption"`
+	Location     string             `bson:"location" json:"location"`
+	CreatedAt    time.Time          `bson:"createdAt" json:"createdAt"`
+	UserID       interface{}        `bson:"userId,omitempty" json:"userId,omitempty"`
+	User         bson.M             `bson:"user,omitempty" json:"user"`
+	CommentCount int                `bson:"commentCount" json:"commentCount"`
+	LikeCount    int                `bson:"likeCount" json:"likeCount"`
+	ImageCount   int                `bson:"imageCount,omitempty" json:"imageCount,omitempty" binding:"gt=0"`
 }
 
-func (post *Post) NormalizeFields(withTimestamps bool) {
-	post.Category = strings.TrimSpace(post.Category)
-	post.Content = strings.TrimSpace(post.Content)
-	post.Title = strings.TrimSpace(post.Title)
+func (post *Post) GeneratePresignedURLKeys() []string {
+	keys := make([]string, post.ImageCount)
 
-	if withTimestamps {
-		post.CreatedAt = time.Now()
-		post.UpdatedAt = time.Now()
+	for index := range keys {
+		keys[index] = post.ID.Hex() + "/" + strconv.Itoa(index)
+	}
+
+	return keys
+}
+
+func (post *Post) NormalizeFields(user *User) {
+	post.ID = primitive.NewObjectID()
+	post.CreatedAt = time.Now()
+	post.UserID = &user.ID
+}
+
+func (post *Post) SetUser(user *User) {
+	post.UserID = nil
+	post.User = bson.M{
+		"username": user.Username,
+		"image":    user.Image,
 	}
 }
 
-func (post *Post) UpdateFields(body *Post) {
-	post.Category = body.Category
-	post.Content = body.Content
-	post.Title = body.Title
+func (post *Post) SetImages(urls []string) {
+	post.ImageCount = 0
+	post.Images = make([]string, len(urls))
+
+	for index, url := range urls {
+		post.Images[index] = strings.Split(url, "?")[0]
+	}
+}
+
+func MapPostsToUserSubDocuments(posts ...Post) bson.A {
+	postDocuments := make(bson.A, len(posts))
+
+	for index, post := range posts {
+		postDocument := bson.M{
+			"_id":          post.ID,
+			"images":       post.Images,
+			"likeCount":    post.LikeCount,
+			"commentCount": post.CommentCount,
+			"createdAt":    post.CreatedAt,
+		}
+		postDocuments[index] = postDocument
+	}
+
+	return postDocuments
 }

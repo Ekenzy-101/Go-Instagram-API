@@ -17,20 +17,26 @@ import (
 	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type LoginTestSuite struct {
 	suite.Suite
-	Email        string
-	Password     string
-	ResponseBody map[string]string
+	Email           string
+	Password        string
+	ResponseBody    bson.M
+	UsersCollection *mongo.Collection
+}
+
+func (suite *LoginTestSuite) SetupSuite() {
+	services.CreateMongoDBConnection()
+	suite.UsersCollection = services.GetMongoDBCollection(config.UsersCollection)
 }
 
 func (suite *LoginTestSuite) SetupTest() {
-	services.CreateMongoDBConnection()
 	suite.Email = "test@gmail.com"
 	suite.Password = "123456"
-	suite.ResponseBody = map[string]string{}
+	suite.ResponseBody = bson.M{}
 
 	user := models.User{
 		Name:     "test",
@@ -39,12 +45,14 @@ func (suite *LoginTestSuite) SetupTest() {
 	}
 	user.HashPassword()
 
-	collection := services.GetMongoDBCollection(config.UsersCollection)
-	collection.InsertOne(context.TODO(), &user)
+	_, err := suite.UsersCollection.InsertOne(context.Background(), &user)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (suite *LoginTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, error) {
-	requestBodyMap := map[string]string{"email": suite.Email, "password": suite.Password}
+	requestBodyMap := bson.M{"email": suite.Email, "password": suite.Password}
 	requestBodyBytes, err := json.Marshal(requestBodyMap)
 	if err != nil {
 		return nil, err
@@ -67,11 +75,13 @@ func (suite *LoginTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, error
 }
 
 func (suite *LoginTestSuite) TearDownTest() {
-	collection := services.GetMongoDBCollection(config.UsersCollection)
-	collection.DeleteMany(context.TODO(), bson.D{})
+	_, err := suite.UsersCollection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
-func (suite *LoginTestSuite) Test_Login_SucceedsWithValidInputs() {
+func (suite *LoginTestSuite) Test_Login_Succeeds() {
 	response, err := suite.ExecuteRequest()
 	if err != nil {
 		log.Fatal(err)

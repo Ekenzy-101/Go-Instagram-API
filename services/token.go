@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/dgrijalva/jwt-go"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type JWTOption struct {
@@ -12,8 +13,8 @@ type JWTOption struct {
 }
 
 type AccessTokenClaim struct {
-	Email string `json:"email"`
-	ID    string `json:"_id"`
+	Email string             `json:"email"`
+	ID    primitive.ObjectID `json:"_id"`
 	jwt.StandardClaims
 }
 

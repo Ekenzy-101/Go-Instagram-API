@@ -8,22 +8,32 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Authorizer() gin.HandlerFunc {
+func Authorizer(credentialsRequired bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		token, err := c.Cookie("token")
+		accessToken, err := c.Cookie(config.AccessTokenCookieName)
+		if err != nil && credentialsRequired {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "No token found"})
+			return
+		}
+
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "No cookie found"})
+			c.Next()
 			return
 		}
 
 		option := services.JWTOption{
 			Secret: config.AccessTokenSecret,
-			Token:  token,
+			Token:  accessToken,
 			Claims: &services.AccessTokenClaim{},
 		}
 		user, err := services.VerifyToken(option)
-		if err != nil {
+		if err != nil && credentialsRequired {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": err.Error()})
+			return
+		}
+
+		if err != nil {
+			c.Next()
 			return
 		}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/dgrijalva/jwt-go"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/argon2"
 )
@@ -31,14 +32,14 @@ type User struct {
 	Email           string             `bson:"email" json:"email,omitempty" binding:"email,max=255"`
 	FollowerCount   int                `bson:"followerCount" json:"followerCount"`
 	FollowingCount  int                `bson:"followingCount" json:"followingCount"`
-	Gender          string             `bson:"gender" json:"gender"`
+	Gender          string             `bson:"gender" json:"gender,omitempty"`
 	Image           string             `bson:"image" json:"image"`
-	Name            string             `bson:"name" json:"name,omitempty" binding:"required,alpha,max=50"`
+	Name            string             `bson:"name" json:"name" binding:"required,name,max=50"`
 	Password        string             `bson:"password" json:"password,omitempty"  binding:"required,min=6"`
 	PostCount       int                `bson:"postCount" json:"postCount"`
-	Posts           []Post             `bson:"posts" json:"posts"`
+	Posts           []bson.M           `bson:"posts" json:"posts"`
 	PhoneNo         string             `bson:"phoneNo" json:"phoneNo,omitempty"`
-	Username        string             `bson:"username" json:"username,omitempty" binding:"username"`
+	Username        string             `bson:"username" json:"username" binding:"username"`
 	Website         string             `bson:"website" json:"website"`
 }
 
@@ -71,10 +72,19 @@ func (user *User) ComparePassword(password string) (bool, error) {
 	return (subtle.ConstantTimeCompare(decodedHash, comparisonHash) == 1), nil
 }
 
-func (user *User) GenerateToken() (string, error) {
+func (user *User) GetPostIds() bson.A {
+	postIds := bson.A{}
+	for _, post := range user.Posts {
+		postIds = append(postIds, post["_id"])
+	}
+
+	return postIds
+}
+
+func (user *User) GenerateAccessToken() (string, error) {
 	claims := &services.AccessTokenClaim{
 		Email: user.Email,
-		ID:    user.ID.Hex(),
+		ID:    user.ID,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Local().Add(time.Second * config.AccessTokenTTLInSeconds).Unix(),
 		},
@@ -114,6 +124,7 @@ func (user *User) NormalizeFields(new bool) {
 	user.Name = strings.TrimSpace(user.Name)
 
 	if new {
+		user.Posts = []bson.M{}
 		user.ID = primitive.NewObjectID()
 		user.CreatedAt = time.Now()
 	}

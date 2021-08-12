@@ -42,28 +42,30 @@ func Register(c *gin.Context) {
 
 	_, err = collection.InsertOne(ctx, user)
 	if mongo.IsDuplicateKeyError(err) {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "User already exists"})
+		if strings.Contains(err.Error(), "email_1") {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "A user with this email already exists"})
+			return
+		}
+
+		if strings.Contains(err.Error(), "username_1") {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "A user with this username already exists"})
+			return
+		}
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	if mongo.IsTimeout(err) {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "We couldn't complete your request. Please try again"})
-		return
-	}
-
-	if mongo.IsNetworkError(err) {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "Network Error " + err.Error()})
-		return
-	}
-
-	token, err := user.GenerateToken()
+	accessToken, err := user.GenerateAccessToken()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
 	user.Password = ""
-	c.SetCookie("token", token, config.AccessTokenTTLInSeconds, "/", "", config.IsProduction, true)
+	c.SetCookie(config.AccessTokenCookieName, accessToken, config.AccessTokenTTLInSeconds, "/", "", config.IsProduction, true)
 	c.JSON(http.StatusCreated, user)
 }
 
@@ -88,13 +90,8 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	if mongo.IsTimeout(err) {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "We couldn't complete your request. Please try again"})
-		return
-	}
-
-	if mongo.IsNetworkError(err) {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "Network Error " + err.Error()})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
@@ -109,18 +106,18 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, err := user.GenerateToken()
+	accessToken, err := user.GenerateAccessToken()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
 	user.Password = ""
-	c.SetCookie("token", token, config.AccessTokenTTLInSeconds, "/", "", config.IsProduction, true)
+	c.SetCookie(config.AccessTokenCookieName, accessToken, config.AccessTokenTTLInSeconds, "/", "", config.IsProduction, true)
 	c.JSON(http.StatusOK, user)
 }
 
 func Logout(c *gin.Context) {
-	c.SetCookie("token", "", -1, "/", "", false, true)
+	c.SetCookie(config.AccessTokenCookieName, "", -1, "/", "", config.IsProduction, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Success"})
 }

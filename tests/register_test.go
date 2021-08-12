@@ -17,31 +17,39 @@ import (
 	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
-)
-
-var (
-	email    string
-	password string
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type RegisterTestSuite struct {
 	suite.Suite
-	Email        string
-	Password     string
-	Name         string
-	ResponseBody map[string]string
+	Email           string
+	Name            string
+	Password        string
+	ResponseBody    bson.M
+	Username        string
+	UsersCollection *mongo.Collection
+}
+
+func (suite *RegisterTestSuite) SetupSuite() {
+	services.CreateMongoDBConnection()
+	suite.UsersCollection = services.GetMongoDBCollection(config.UsersCollection)
 }
 
 func (suite *RegisterTestSuite) SetupTest() {
-	services.CreateMongoDBConnection()
 	suite.Email = "test@gmail.com"
 	suite.Password = "123456"
 	suite.Name = "test"
-	suite.ResponseBody = map[string]string{}
+	suite.Username = "testuser"
+	suite.ResponseBody = bson.M{}
 }
 
 func (suite *RegisterTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, error) {
-	requestBodyMap := map[string]interface{}{"email": suite.Email, "password": suite.Password, "name": suite.Name}
+	requestBodyMap := bson.M{
+		"email":    suite.Email,
+		"password": suite.Password,
+		"name":     suite.Name,
+		"username": suite.Username,
+	}
 	requestBodyBytes, err := json.Marshal(requestBodyMap)
 	if err != nil {
 		return nil, err
@@ -64,17 +72,16 @@ func (suite *RegisterTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, er
 }
 
 func (suite *RegisterTestSuite) TearDownTest() {
-	collection := services.GetMongoDBCollection(config.UsersCollection)
-	collection.DeleteMany(context.TODO(), bson.D{})
+	suite.UsersCollection.DeleteMany(context.Background(), bson.M{})
 }
 
-func (suite *RegisterTestSuite) Test_Register_SucceedsWithValidInputs() {
+func (suite *RegisterTestSuite) Test_Register_Succeeds() {
 	response, err := suite.ExecuteRequest()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	subset := []string{"_id", "name", "email"}
+	subset := []string{"_id", "name", "email", "username", "followerCount", "followingCount", "postCount"}
 
 	suite.Equal(http.StatusCreated, response.Code)
 	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
@@ -85,26 +92,31 @@ func (suite *RegisterTestSuite) Test_Register_FailsWithInvalidInputs() {
 	suite.Email = strings.Repeat("a", 247) + "@gmail.com"
 	suite.Password = "111"
 	suite.Name = ""
+	suite.Username = ".username-"
 
 	response, err := suite.ExecuteRequest()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	subset := []string{"password", "name", "email"}
+	subset := []string{"password", "name", "email", "username"}
 
 	suite.Equal(http.StatusBadRequest, response.Code)
 	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
 }
 
-func (suite *RegisterTestSuite) Test_Register_FailsIfUserExistsInDatabase() {
+func (suite *RegisterTestSuite) Test_Register_FailsIfEmailExistsInDatabase() {
 	user := models.User{
 		Name:     suite.Name,
 		Email:    suite.Email,
 		Password: suite.Password,
+		Username: "anotherusername",
 	}
 	collection := services.GetMongoDBCollection(config.UsersCollection)
-	collection.InsertOne(context.TODO(), user)
+	_, err := collection.InsertOne(context.Background(), user)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	response, err := suite.ExecuteRequest()
 	if err != nil {
@@ -112,7 +124,25 @@ func (suite *RegisterTestSuite) Test_Register_FailsIfUserExistsInDatabase() {
 	}
 
 	suite.Equal(http.StatusBadRequest, response.Code)
-	suite.Contains(suite.ResponseBody, "message")
+	suite.Contains(suite.ResponseBody["message"], "email")
+}
+func (suite *RegisterTestSuite) Test_Register_FailsIfUsernameExistsInDatabase() {
+	user := models.User{
+		Name:     suite.Name,
+		Email:    "anotheremail@gmail.com",
+		Password: suite.Password,
+		Username: suite.Username,
+	}
+	collection := services.GetMongoDBCollection(config.UsersCollection)
+	collection.InsertOne(context.Background(), user)
+
+	response, err := suite.ExecuteRequest()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	suite.Equal(http.StatusBadRequest, response.Code)
+	suite.Contains(suite.ResponseBody["message"], "username")
 }
 
 func TestRegisterTestSuite(t *testing.T) {

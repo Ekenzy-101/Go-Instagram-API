@@ -33,12 +33,13 @@ func TestComparePassword(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, ok)
 }
-func TestGenerateToken(t *testing.T) {
+
+func TestGenerateAccessToken(t *testing.T) {
 	user := &User{
 		Email: email,
 		ID:    userId,
 	}
-	token, err := user.GenerateToken()
+	token, err := user.GenerateAccessToken()
 	signedToken = token
 
 	assert.NoError(t, err)

@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	usernameRegex = regexp.MustCompile(`^([a-z0-9_])([a-z0-9_.]){4,28}([a-z0-9_])$`)
+	usernameRegex = regexp.MustCompile("^[a-z0-9_][a-z0-9_.]{4,28}[a-z0-9_]$")
+	nameRegex     = regexp.MustCompile("^[a-zA-Z][a-zA-z ]*$")
 )
 
 type DefaultValidator struct {
@@ -41,6 +42,7 @@ func (v *DefaultValidator) lazyinit() {
 		v.validate = validator.New()
 		v.validate.SetTagName("binding")
 		v.validate.RegisterValidation("username", validateUserName)
+		v.validate.RegisterValidation("name", validateName)
 		v.validate.RegisterTagNameFunc(jsonTagName)
 	})
 }
@@ -61,6 +63,10 @@ func kindOfData(data interface{}) reflect.Kind {
 		valueType = value.Elem().Kind()
 	}
 	return valueType
+}
+
+func validateName(fl validator.FieldLevel) bool {
+	return nameRegex.MatchString(fl.Field().String())
 }
 
 func validateUserName(fl validator.FieldLevel) bool {
