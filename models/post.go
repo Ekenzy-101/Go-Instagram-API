@@ -10,16 +10,16 @@ import (
 )
 
 type Post struct {
-	ID           primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty" `
-	Images       []string           `bson:"images" json:"images"`
-	Caption      string             `bson:"caption" json:"caption"`
-	Location     string             `bson:"location" json:"location"`
-	CreatedAt    time.Time          `bson:"createdAt" json:"createdAt"`
-	UserID       interface{}        `bson:"userId,omitempty" json:"userId,omitempty"`
-	User         bson.M             `bson:"user,omitempty" json:"user"`
-	CommentCount int                `bson:"commentCount" json:"commentCount"`
-	LikeCount    int                `bson:"likeCount" json:"likeCount"`
-	ImageCount   int                `bson:"imageCount,omitempty" json:"imageCount,omitempty" binding:"gt=0"`
+	ID            primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty" `
+	Images        []string           `bson:"images" json:"images"`
+	Caption       string             `bson:"caption" json:"caption"`
+	Location      string             `bson:"location" json:"location"`
+	CreatedAt     time.Time          `bson:"createdAt" json:"createdAt"`
+	UserID        interface{}        `bson:"userId,omitempty" json:"userId,omitempty"`
+	User          bson.M             `bson:"user,omitempty" json:"user"`
+	CommentsCount int                `bson:"commentsCount" json:"commentsCount"`
+	LikesCount    int                `bson:"likesCount" json:"likesCount"`
+	ImageCount    int                `bson:"imageCount,omitempty" json:"imageCount,omitempty" binding:"gt=0"`
 }
 
 func (post *Post) GeneratePresignedURLKeys() []string {
@@ -60,11 +60,11 @@ func MapPostsToUserSubDocuments(posts ...Post) bson.A {
 
 	for index, post := range posts {
 		postDocument := bson.M{
-			"_id":          post.ID,
-			"images":       post.Images,
-			"likeCount":    post.LikeCount,
-			"commentCount": post.CommentCount,
-			"createdAt":    post.CreatedAt,
+			"_id":           post.ID,
+			"images":        post.Images,
+			"likesCount":    post.LikesCount,
+			"commentsCount": post.CommentsCount,
+			"createdAt":     post.CreatedAt,
 		}
 		postDocuments[index] = postDocument
 	}

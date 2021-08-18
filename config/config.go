@@ -9,11 +9,13 @@ import (
 )
 
 const (
-	AccessTokenCookieName     = "access_token"
-	AccessTokenTTLInSeconds   = 3600
-	PostsCollection           = "posts"
-	PostsLengthInUserDocument = 12
-	UsersCollection           = "users"
+	AccessTokenCookieName   = "access_token"
+	AccessTokenTTLInSeconds = 3600
+	CommonPaginationLength  = 12
+	FriendsPaginationLength = 2 // TODO: Change later to 1200
+	UserDetailsCollection   = "user_details"
+	PostsCollection         = "posts"
+	UsersCollection         = "users"
 )
 
 var (
@@ -31,7 +33,7 @@ var (
 func init() {
 	filename := ""
 	if IsTesting {
-		filename = "../.env.test"
+		filename = "/home/kenzy/tutorial-projects/go-blog-api/.env.test"
 	}
 
 	if IsDevelopment {
