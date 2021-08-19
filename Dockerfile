@@ -1,28 +1,25 @@
-FROM golang:alpine
+FROM golang:1.16-alpine3.14 as build_image
+# FROM golang:1.16-buster as build_image
 
-ENV GO111MODULE=on \
-    CGO_ENABLED=0 \
-    GOOS=linux \
-    GOARCH=amd64 \
-    GIN_MODE=release \
-    MONGODB_NAME=gomongo \
-    MONGO_URI=mongodb://localhost:27017 \
-    CLIENT_ORIGIN=http://localhost:3000 \
-    APP_ACCESS_SECRET=tEuxpYpBmyMpUwBxD1mjYbWcrPSB57BP
-
-WORKDIR /build
+WORKDIR /app
 
 COPY ["go.mod", "go.sum", "./"] 
+
 RUN go mod download
 
 COPY . .
 
 RUN go build -o main .
 
-WORKDIR /dist
+FROM alpine:3.14
+# FROM gcr.io/distroless/base-debian10
 
-RUN cp /build/main .
+RUN apk add --no-cache ca-certificates
+
+WORKDIR /
+
+COPY --from=build_image /app/main .
 
 EXPOSE 5000
 
-CMD ["/dist/main"]
+ENTRYPOINT ["./main"]
