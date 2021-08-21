@@ -11,8 +11,9 @@ import (
 const (
 	AccessTokenCookieName   = "access_token"
 	AccessTokenTTLInSeconds = 3600
+	CommentsCollection      = "comments"
 	CommonPaginationLength  = 12
-	FriendsPaginationLength = 2 // TODO: Change later to 1200
+	LargePaginationLength   = 2 // TODO: Change later to 1200
 	UserDetailsCollection   = "user_details"
 	PostsCollection         = "posts"
 	UsersCollection         = "users"

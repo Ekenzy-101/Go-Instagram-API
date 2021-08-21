@@ -1,11 +1,18 @@
 package helpers
 
 import (
+	"log"
 	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
+
+func ExitIfError(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 func GenerateErrorMessages(errors validator.ValidationErrors) map[string]string {
 	messages := make(map[string]string)
@@ -28,6 +35,8 @@ func GenerateErrorMessages(errors validator.ValidationErrors) map[string]string 
 			messages[field] = strings.Title(field) + " should be up to " + err.Param() + " characters"
 		case "oneof":
 			messages[field] = strings.Title(field) + " should be in these category " + err.Param()
+		case "object_id":
+			messages[field] = strings.Title(field) + " is not a valid ObjectID"
 		case "required":
 			messages[field] = strings.Title(field) + " is required"
 		case "username":

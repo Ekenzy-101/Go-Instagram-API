@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/go-playground/validator/v10"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var (
@@ -41,8 +42,16 @@ func (v *DefaultValidator) lazyinit() {
 	v.once.Do(func() {
 		v.validate = validator.New()
 		v.validate.SetTagName("binding")
-		v.validate.RegisterValidation("username", validateUserName)
-		v.validate.RegisterValidation("name", validateName)
+
+		err := v.validate.RegisterValidation("username", validateUserName)
+		ExitIfError(err)
+
+		err = v.validate.RegisterValidation("name", validateName)
+		ExitIfError(err)
+
+		err = v.validate.RegisterValidation("object_id", validateObjectID)
+		ExitIfError(err)
+
 		v.validate.RegisterTagNameFunc(jsonTagName)
 	})
 }
@@ -63,6 +72,10 @@ func kindOfData(data interface{}) reflect.Kind {
 		valueType = value.Elem().Kind()
 	}
 	return valueType
+}
+
+func validateObjectID(fl validator.FieldLevel) bool {
+	return primitive.IsValidObjectID(fl.Field().String())
 }
 
 func validateName(fl validator.FieldLevel) bool {
