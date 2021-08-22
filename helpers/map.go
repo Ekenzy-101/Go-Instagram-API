@@ -1,18 +1,10 @@
 package helpers
 
 import (
-	"log"
-	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
-
-func ExitIfError(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 func GenerateErrorMessages(errors validator.ValidationErrors) map[string]string {
 	messages := make(map[string]string)
@@ -42,43 +34,9 @@ func GenerateErrorMessages(errors validator.ValidationErrors) map[string]string 
 		case "username":
 			messages[field] = strings.Title(field) + " is not valid"
 		default:
-			messages[field] = "Field is invalid"
+			messages[field] = strings.Title(field) + " is invalid"
 		}
 	}
 
 	return messages
-}
-
-func GetMapKeys(object interface{}) []string {
-	reflectValue := reflect.ValueOf(object)
-	if reflectValue.Kind() != reflect.Map {
-		panic("value must be a map")
-	}
-
-	reflectType := reflect.TypeOf(object)
-	if reflectType.Key().Kind() != reflect.String {
-		panic("key must be a string")
-	}
-
-	keys := []string{}
-	for _, key := range reflectValue.MapKeys() {
-		keys = append(keys, key.String())
-	}
-
-	return keys
-}
-
-func GetMapValues(object interface{}) []interface{} {
-	reflectValue := reflect.ValueOf(object)
-	if reflectValue.Kind() != reflect.Map {
-		panic("value must be a map")
-	}
-
-	iter := reflectValue.MapRange()
-	values := []interface{}{}
-	for iter.Next() {
-		values = append(values, iter.Value().Interface())
-	}
-
-	return values
 }

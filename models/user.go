@@ -1,19 +1,24 @@
 package models
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -36,22 +41,11 @@ type User struct {
 	Image           string      `bson:"image" json:"image"`
 	Name            string      `bson:"name" json:"name" binding:"required,name,max=50"`
 	Password        string      `bson:"password" json:"password,omitempty"  binding:"required,min=6"`
-	PostsCount      int         `bson:"postCount" json:"postCount"`
+	PostsCount      int         `bson:"postsCount" json:"postsCount"`
 	Posts           []bson.M    `bson:"posts" json:"posts"`
 	PhoneNo         string      `bson:"phoneNo" json:"phoneNo,omitempty"`
 	Username        string      `bson:"username" json:"username" binding:"username"`
 	Website         string      `bson:"website" json:"website"`
-}
-
-type UserDetails struct {
-	ID               primitive.ObjectID `bson:"_id,omitempty"  json:"_id"`
-	Followers        []interface{}      `bson:"followers" json:"followers"`
-	FollowersCount   int                `bson:"followersCount" json:"followersCount"`
-	FollowersSkipped int                `bson:"followersSkipped" json:"followersSkipped"`
-	Following        []interface{}      `bson:"following" json:"following"`
-	FollowingCount   int                `bson:"followingCount" json:"followingCount"`
-	FollowingSkipped int                `bson:"followingSkipped" json:"followingSkipped"`
-	UserID           interface{}        `bson:"userId" json:"userId"`
 }
 
 func (user *User) ComparePassword(password string) (bool, error) {
@@ -138,5 +132,34 @@ func (user *User) NormalizeFields(new bool) {
 		user.Posts = []bson.M{}
 		user.ID = primitive.NewObjectID()
 		user.CreatedAt = time.Now()
+	}
+}
+
+type FindUserResult struct {
+	User         *User
+	ResponseBody interface{}
+	StatusCode   int
+}
+
+func FindUser(ctx context.Context, filter interface{}, options ...*options.FindOneOptions) *FindUserResult {
+	user := &User{}
+	collection := services.GetMongoDBCollection(config.UsersCollection)
+	err := collection.FindOne(ctx, filter, options...).Decode(user)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return &FindUserResult{
+			ResponseBody: gin.H{"message": "User not found"},
+			StatusCode:   http.StatusNotFound,
+		}
+	}
+
+	if err != nil {
+		return &FindUserResult{
+			ResponseBody: gin.H{"message": err.Error()},
+			StatusCode:   http.StatusInternalServerError,
+		}
+	}
+
+	return &FindUserResult{
+		User: user,
 	}
 }

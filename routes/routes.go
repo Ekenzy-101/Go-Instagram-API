@@ -37,9 +37,18 @@ func SetupRouter() *gin.Engine {
 		authRouter.POST("/register", handlers.Register)
 	}
 
+	friendshipRouter := router.Group("friendships")
+	{
+		friendshipRouter.GET("/:_id/followers", handlers.GetUserFollowers)
+		friendshipRouter.GET("/:_id/following", handlers.GetUserFollowing)
+		friendshipRouter.POST("/:_id/follow", Authorizer(true), handlers.FollowUser)
+		friendshipRouter.POST("/:_id/unfollow", Authorizer(true), handlers.UnfollowUser)
+	}
+
 	postRouter := router.Group("posts")
 	{
 		postRouter.POST("", Authorizer(true), handlers.CreatePost)
+		postRouter.POST("/:_id/save", Authorizer(true), handlers.SavePost)
 		postRouter.DELETE("/:_id", Authorizer(true), handlers.DeletePost)
 		postRouter.GET("/:_id", handlers.GetPost)
 	}
@@ -51,14 +60,6 @@ func SetupRouter() *gin.Engine {
 		userRouter.GET("/:username/posts/:_id/similar", handlers.GetUserSimilarPosts)
 		userRouter.GET("/me/posts/home", Authorizer(true), handlers.GetUserHomePosts)
 		userRouter.GET("/me/posts/saved", Authorizer(true), handlers.GetUserSavedPosts)
-	}
-
-	friendRouter := router.Group("friendships")
-	{
-		friendRouter.GET("/:_id/followers", handlers.GetUserFollowers)
-		friendRouter.GET("/:_id/following", handlers.GetUserFollowing)
-		friendRouter.POST("/:_id/follow", Authorizer(true), handlers.FollowUser)
-		friendRouter.POST("/:_id/unfollow", Authorizer(true), handlers.UnfollowUser)
 	}
 
 	return router
