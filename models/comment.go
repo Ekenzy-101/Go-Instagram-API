@@ -47,6 +47,7 @@ func (comment *Comment) SetUser(user *User) {
 }
 
 type FindCommentResult struct {
+	Error        error
 	Comment      *Comment
 	ResponseBody interface{}
 	StatusCode   int
@@ -60,6 +61,7 @@ func FindComment(ctx context.Context, filter interface{}, options ...*options.Fi
 		return &FindCommentResult{
 			ResponseBody: gin.H{"message": "Comment not found"},
 			StatusCode:   http.StatusNotFound,
+			Error:        err,
 		}
 	}
 
@@ -67,6 +69,7 @@ func FindComment(ctx context.Context, filter interface{}, options ...*options.Fi
 		return &FindCommentResult{
 			ResponseBody: gin.H{"message": err.Error()},
 			StatusCode:   http.StatusInternalServerError,
+			Error:        err,
 		}
 	}
 

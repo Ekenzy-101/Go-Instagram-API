@@ -37,6 +37,13 @@ func SetupRouter() *gin.Engine {
 		authRouter.POST("/register", handlers.Register)
 	}
 
+	commentRouter := router.Group("comments")
+	{
+		commentRouter.GET("", handlers.GetComments)
+		commentRouter.POST("", Authorizer(true), handlers.CreateComment)
+		commentRouter.DELETE("/:_id", Authorizer(true), handlers.DeleteComment)
+	}
+
 	friendshipRouter := router.Group("friendships")
 	{
 		friendshipRouter.GET("/:_id/followers", handlers.GetUserFollowers)

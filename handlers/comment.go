@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -70,13 +71,103 @@ func CreateComment(c *gin.Context) {
 }
 
 func DeleteComment(c *gin.Context) {
-	// Validate decoded token
-	// Validate commentId
-	// Check if comment exist and authuser is owner
-	// Find post for the given comment
-	// Delete replies of comment
-	// Delete comment in the subdocument and reduce count
-	// Find top level comment and append to the post
+	cliams, ok := c.MustGet("user").(*services.AccessTokenClaim)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse decoded token"})
+		return
+	}
+
+	commentIdParamValue := c.Param("_id")
+	commentId, err := primitive.ObjectIDFromHex(commentIdParamValue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid commentId", commentIdParamValue)})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	findUserResult := models.FindUser(ctx, bson.M{"_id": cliams.ID})
+	if findUserResult.User == nil {
+		c.JSON(findUserResult.StatusCode, findUserResult.ResponseBody)
+		return
+	}
+
+	findCommentResult := models.FindComment(ctx, bson.M{"_id": commentId})
+	if findCommentResult.Comment == nil {
+		c.JSON(findCommentResult.StatusCode, findCommentResult.ResponseBody)
+		return
+	}
+
+	if cliams.ID != findCommentResult.Comment.UserID {
+		c.JSON(http.StatusForbidden, gin.H{"message": "You are not allowed to delete this comment"})
+		return
+	}
+
+	findPostResult := models.FindPost(ctx, bson.M{"_id": findCommentResult.Comment.PostID})
+	if findPostResult.Post == nil {
+		c.JSON(findPostResult.StatusCode, findPostResult.ResponseBody)
+		return
+	}
+
+	session, err := services.GetMongoDBSession()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	defer session.EndSession(ctx)
+
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		post := findPostResult.Post
+
+		repliesCollection := services.GetMongoDBCollection(config.RepliesCollection)
+		_, err := repliesCollection.DeleteMany(sessCtx, bson.M{"replyToId": commentId})
+		if err != nil {
+			return nil, err
+		}
+
+		commentsCollection := services.GetMongoDBCollection(config.CommentsCollection)
+		_, err = commentsCollection.DeleteOne(sessCtx, bson.M{"_id": commentId})
+		if err != nil {
+			return nil, err
+		}
+
+		findOneOptions := options.FindOne().SetSort(bson.M{"createdAt": -1})
+		filter := bson.M{"_id": bson.M{"$nin": post.GetCommentIds()}}
+
+		result := models.FindComment(sessCtx, filter, findOneOptions)
+		if result.Comment == nil && result.StatusCode != http.StatusNotFound {
+			return nil, result.Error
+		}
+
+		postsCollection := services.GetMongoDBCollection(config.PostsCollection)
+		if result.Comment != nil {
+			update := bson.M{"$push": bson.M{"comments": result.Comment}}
+			_, err := postsCollection.UpdateByID(sessCtx, post.ID, update)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		update := bson.M{
+			"$inc":  bson.M{"commentsCount": -1},
+			"$pull": bson.M{"comments": bson.M{"_id": commentId}},
+		}
+		_, err = postsCollection.UpdateByID(sessCtx, post.ID, update)
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}
+
+	_, err = session.WithTransaction(ctx, callback)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Success"})
 }
 
 func GetComments(c *gin.Context) {
