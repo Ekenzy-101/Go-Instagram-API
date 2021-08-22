@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/routes"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
@@ -9,5 +11,8 @@ import (
 func main() {
 	services.CreateMongoDBConnection()
 	router := routes.SetupRouter()
-	router.Run(":" + config.Port)
+	err := router.Run(":" + config.Port)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
