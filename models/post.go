@@ -17,6 +17,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+var (
+	PostProjection = bson.M{"images": 1, "likesCount": 1, "commentsCount": 1, "createdAt": 1}
+)
+
 type Post struct {
 	ID            primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty" `
 	Caption       string             `bson:"caption" json:"caption"`

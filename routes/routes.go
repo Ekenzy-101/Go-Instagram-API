@@ -65,6 +65,7 @@ func SetupRouter() *gin.Engine {
 		userRouter.GET("/:username", handlers.GetUser)
 		userRouter.GET("/:username/posts/profile", handlers.GetUserProfilePosts)
 		userRouter.GET("/:username/posts/:_id/similar", handlers.GetUserSimilarPosts)
+		userRouter.GET("/:username/posts/tagged", handlers.GetUserTaggedPosts)
 		userRouter.GET("/me/posts/home", Authorizer(true), handlers.GetUserHomePosts)
 		userRouter.GET("/me/posts/saved", Authorizer(true), handlers.GetUserSavedPosts)
 	}
