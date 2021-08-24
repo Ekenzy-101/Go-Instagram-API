@@ -27,15 +27,16 @@ type Comment struct {
 	UserID       interface{}        `bson:"userId,omitempty" json:"userId,omitempty"`
 }
 
-func (comment *Comment) NormalizeFields(userId primitive.ObjectID) {
+func (comment *Comment) NormalizeFields(userId primitive.ObjectID) error {
 	var err error
 	comment.CreatedAt = time.Now()
 	comment.ID = primitive.NewObjectID()
 	comment.UserID = userId
 	comment.PostID, err = primitive.ObjectIDFromHex(fmt.Sprintf("%v", comment.PostID))
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func (comment *Comment) SetUser(user *User) {

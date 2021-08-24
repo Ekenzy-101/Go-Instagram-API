@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	PostProjection = bson.M{"images": 1, "likesCount": 1, "commentsCount": 1, "createdAt": 1}
+	PostProjection = bson.M{"images": 1, "likesCount": 1, "commentsCount": 1, "createdAt": 1, "repliesCount": 1}
 )
 
 type Post struct {
@@ -31,6 +31,7 @@ type Post struct {
 	ImageCount    int                `bson:"imageCount,omitempty" json:"imageCount,omitempty" binding:"gt=0"`
 	LikesCount    int                `bson:"likesCount" json:"likesCount"`
 	Location      string             `bson:"location" json:"location"`
+	RepliesCount  int                `bson:"repliesCount" json:"repliesCount"`
 	User          bson.M             `bson:"user,omitempty" json:"user"`
 	UserID        interface{}        `bson:"userId,omitempty" json:"userId,omitempty"`
 }

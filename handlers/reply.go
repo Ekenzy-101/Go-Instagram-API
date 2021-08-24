@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -18,15 +19,15 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func CreateComment(c *gin.Context) {
+func CreateReply(c *gin.Context) {
 	cliams, ok := c.MustGet("user").(*services.AccessTokenClaim)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse decoded token"})
 		return
 	}
 
-	comment := &models.Comment{}
-	messages := helpers.ValidateRequestBody(c, comment)
+	reply := &models.Reply{}
+	messages := helpers.ValidateRequestBody(c, reply)
 	if messages != nil {
 		c.JSON(http.StatusBadRequest, messages)
 		return
@@ -42,76 +43,27 @@ func CreateComment(c *gin.Context) {
 		return
 	}
 
-	err := comment.NormalizeFields(cliams.ID)
+	err := reply.NormalizeFields(cliams.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	update := bson.M{
-		"$push": bson.M{"comments": bson.M{"$each": bson.A{comment}, "$position": 0, "$slice": config.CommonPaginationLength}},
-		"$inc":  bson.M{"commentsCount": 1},
-	}
-	postsCollection := services.GetMongoDBCollection(config.PostsCollection)
-	updateOneResult, err := postsCollection.UpdateByID(ctx, comment.PostID, update)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+	findOneOptions = options.FindOne().SetProjection(bson.M{"_id": 1})
+	findPostResult := models.FindPost(ctx, bson.M{"_id": reply.PostID}, findOneOptions)
+	if findPostResult.Post == nil {
+		c.JSON(findPostResult.StatusCode, findPostResult.ResponseBody)
 		return
 	}
 
-	if updateOneResult.MatchedCount == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"message": "Post not found"})
-		return
-	}
-
-	commentsCollection := services.GetMongoDBCollection(config.CommentsCollection)
-	_, err = commentsCollection.InsertOne(ctx, comment)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	comment.SetUser(findUserResult.User)
-	c.JSON(http.StatusCreated, gin.H{"comment": comment})
-}
-
-func DeleteComment(c *gin.Context) {
-	cliams, ok := c.MustGet("user").(*services.AccessTokenClaim)
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse decoded token"})
-		return
-	}
-
-	commentIdParamValue := c.Param("_id")
-	commentId, err := primitive.ObjectIDFromHex(commentIdParamValue)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid commentId", commentIdParamValue)})
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-
-	findUserResult := models.FindUser(ctx, bson.M{"_id": cliams.ID})
-	if findUserResult.User == nil {
-		c.JSON(findUserResult.StatusCode, findUserResult.ResponseBody)
-		return
-	}
-
-	findCommentResult := models.FindComment(ctx, bson.M{"_id": commentId})
+	findCommentResult := models.FindComment(ctx, bson.M{"_id": reply.ReplyToID})
 	if findCommentResult.Comment == nil {
 		c.JSON(findCommentResult.StatusCode, findCommentResult.ResponseBody)
 		return
 	}
 
-	if cliams.ID != findCommentResult.Comment.UserID {
-		c.JSON(http.StatusForbidden, gin.H{"message": "You are not allowed to delete this comment"})
-		return
-	}
-
-	findPostResult := models.FindPost(ctx, bson.M{"_id": findCommentResult.Comment.PostID})
-	if findPostResult.Post == nil {
-		c.JSON(findPostResult.StatusCode, findPostResult.ResponseBody)
+	if findCommentResult.Comment.PostID != reply.PostID {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "The comment's postId you are replying to does not match with the reply"})
 		return
 	}
 
@@ -123,49 +75,105 @@ func DeleteComment(c *gin.Context) {
 	defer session.EndSession(ctx)
 
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
-		post := findPostResult.Post
-
 		repliesCollection := services.GetMongoDBCollection(config.RepliesCollection)
-		_, err := repliesCollection.DeleteMany(sessCtx, bson.M{"postId": post.ID})
+		_, err := repliesCollection.InsertOne(sessCtx, reply)
 		if err != nil {
 			return nil, err
 		}
 
 		commentsCollection := services.GetMongoDBCollection(config.CommentsCollection)
-		_, err = commentsCollection.DeleteOne(sessCtx, bson.M{"_id": commentId})
+		_, err = commentsCollection.UpdateByID(sessCtx, reply.ReplyToID, bson.M{"$inc": bson.M{"repliesCount": 1}})
 		if err != nil {
 			return nil, err
 		}
 
-		findOneOptions := options.FindOne().SetSort(bson.M{"createdAt": -1})
-		filter := bson.M{"_id": bson.M{"$nin": post.GetCommentIds()}}
-
-		result := models.FindComment(sessCtx, filter, findOneOptions)
-		if result.Comment == nil && result.StatusCode != http.StatusNotFound {
-			return nil, result.Error
-		}
-
 		postsCollection := services.GetMongoDBCollection(config.PostsCollection)
-		if result.Comment != nil {
-			update := bson.M{"$push": bson.M{"comments": result.Comment}}
-			_, err := postsCollection.UpdateByID(sessCtx, post.ID, update)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		update := bson.M{
-			"$inc":  bson.M{"commentsCount": -1},
-			"$pull": bson.M{"comments": bson.M{"_id": commentId}},
-		}
-		_, err = postsCollection.UpdateByID(sessCtx, post.ID, update)
+		_, err = postsCollection.UpdateByID(sessCtx, reply.PostID, bson.M{"$inc": bson.M{"repliesCount": 1}})
 		if err != nil {
 			return nil, err
 		}
 
 		return nil, nil
 	}
+	_, err = session.WithTransaction(ctx, callback)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
 
+	reply.SetUser(findUserResult.User)
+	c.JSON(http.StatusCreated, gin.H{"reply": reply})
+}
+
+func DeleteReply(c *gin.Context) {
+	cliams, ok := c.MustGet("user").(*services.AccessTokenClaim)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse decoded token"})
+		return
+	}
+
+	replyIdParamValue := c.Param("_id")
+	replyId, err := primitive.ObjectIDFromHex(replyIdParamValue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid replyId", replyIdParamValue)})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	findOneOptions := options.FindOne().SetProjection(bson.M{"_id": 1})
+	findUserResult := models.FindUser(ctx, bson.M{"_id": cliams.ID}, findOneOptions)
+	if findUserResult.User == nil {
+		c.JSON(findUserResult.StatusCode, findUserResult.ResponseBody)
+		return
+	}
+
+	reply := &models.Reply{}
+	repliesCollection := services.GetMongoDBCollection(config.RepliesCollection)
+	err = repliesCollection.FindOne(ctx, bson.M{"_id": replyId}).Decode(reply)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		c.JSON(http.StatusNotFound, gin.H{"message": "Reply not found"})
+		return
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+
+	if reply.UserID != cliams.ID {
+		c.JSON(http.StatusForbidden, gin.H{"message": "You are not allowed to delete this reply"})
+		return
+	}
+
+	session, err := services.GetMongoDBSession()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	defer session.EndSession(ctx)
+
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		_, err := repliesCollection.DeleteOne(sessCtx, bson.M{"_id": reply.ID})
+		if err != nil {
+			return nil, err
+		}
+
+		commentsCollection := services.GetMongoDBCollection(config.CommentsCollection)
+		_, err = commentsCollection.UpdateByID(sessCtx, reply.ReplyToID, bson.M{"$inc": bson.M{"repliesCount": -1}})
+		if err != nil {
+			return nil, err
+		}
+
+		postsCollection := services.GetMongoDBCollection(config.PostsCollection)
+		_, err = postsCollection.UpdateByID(sessCtx, reply.PostID, bson.M{"$inc": bson.M{"repliesCount": -1}})
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}
 	_, err = session.WithTransaction(ctx, callback)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -175,21 +183,20 @@ func DeleteComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Success"})
 }
 
-func GetComments(c *gin.Context) {
-	postIdQueryValue := c.Query("postId")
-	postId, err := primitive.ObjectIDFromHex(postIdQueryValue)
+func GetReplies(c *gin.Context) {
+	replyToIdQueryValue := c.Query("replyToId")
+	replyToId, err := primitive.ObjectIDFromHex(replyToIdQueryValue)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid postId", postIdQueryValue)})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid replyToId", replyToIdQueryValue)})
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	findOneOptions := options.FindOne().SetProjection(bson.M{"commentsCount": 1})
-	findPostResult := models.FindPost(ctx, bson.M{"_id": postId}, findOneOptions)
-	if findPostResult.Post == nil {
-		c.JSON(findPostResult.StatusCode, findPostResult.ResponseBody)
+	findCommentResult := models.FindComment(ctx, bson.M{"_id": replyToId})
+	if findCommentResult.Comment == nil {
+		c.JSON(findCommentResult.StatusCode, findCommentResult.ResponseBody)
 		return
 	}
 
@@ -214,7 +221,7 @@ func GetComments(c *gin.Context) {
 	}
 
 	pipeline := bson.A{
-		bson.M{"$match": bson.M{"postId": postId}},
+		bson.M{"$match": bson.M{"replyToId": replyToId}},
 		bson.M{"$sort": bson.M{"createdAt": -1}},
 		bson.M{"$skip": skip},
 		bson.M{"$limit": limit},
@@ -239,20 +246,20 @@ func GetComments(c *gin.Context) {
 		bson.M{"$project": bson.M{"userId": 0}},
 	}
 
-	commentsCollection := services.GetMongoDBCollection(config.CommentsCollection)
-	cursor, err := commentsCollection.Aggregate(ctx, pipeline)
+	repliesCollection := services.GetMongoDBCollection(config.RepliesCollection)
+	cursor, err := repliesCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	comments := []models.Comment{}
-	err = cursor.All(ctx, &comments)
+	replies := []models.Reply{}
+	err = cursor.All(ctx, &replies)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	hasNextPage := (limit + skip) < findPostResult.Post.CommentsCount
-	c.JSON(http.StatusOK, gin.H{"comments": comments, "hasNextPage": hasNextPage})
+	hasNextPage := (limit + skip) < findCommentResult.Comment.RepliesCount
+	c.JSON(http.StatusOK, gin.H{"replies": replies, "hasNextPage": hasNextPage})
 }

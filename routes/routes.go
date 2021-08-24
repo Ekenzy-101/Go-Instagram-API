@@ -60,6 +60,13 @@ func SetupRouter() *gin.Engine {
 		postRouter.GET("/:_id", handlers.GetPost)
 	}
 
+	replyRouter := router.Group("replies")
+	{
+		replyRouter.GET("", handlers.GetReplies)
+		replyRouter.POST("", Authorizer(true), handlers.CreateReply)
+		replyRouter.DELETE("/:_id", Authorizer(true), handlers.DeleteReply)
+	}
+
 	userRouter := router.Group("users")
 	{
 		userRouter.GET("/:username", handlers.GetUser)

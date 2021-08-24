@@ -12,6 +12,7 @@ const (
 	AccessTokenCookieName   = "access_token"
 	AccessTokenTTLInSeconds = 3600
 	CommentsCollection      = "comments"
+	RepliesCollection       = "replies"
 	CommonPaginationLength  = 12
 	LargePaginationLength   = 2 // TODO: Change later to 1200
 	UserDetailsCollection   = "user_details"
