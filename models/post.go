@@ -121,6 +121,7 @@ func MapPostsToUserSubDocuments(posts ...Post) bson.A {
 			"likesCount":    post.LikesCount,
 			"commentsCount": post.CommentsCount,
 			"createdAt":     post.CreatedAt,
+			"repliesCount":  post.RepliesCount,
 		}
 		postDocuments[index] = postDocument
 	}

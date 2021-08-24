@@ -151,7 +151,7 @@ func DeletePost(c *gin.Context) {
 		if user.PostsCount > config.CommonPaginationLength {
 			recentPost := bson.M{}
 			filter := bson.M{"_id": bson.M{"$nin": user.GetPostIds()}, "userId": user.ID}
-			findOneOptions := options.FindOne().SetProjection(bson.M{"images": 1, "likesCount": 1, "commentsCount": 1})
+			findOneOptions := options.FindOne().SetProjection(models.PostProjection)
 			findOneOptions.SetSort(bson.M{"createdAt": -1})
 
 			err := postsCollection.FindOne(sessCtx, filter, findOneOptions).Decode(&recentPost)
