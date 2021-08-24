@@ -3,8 +3,8 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
@@ -25,22 +25,6 @@ func CreatePost(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	user := &models.User{}
-	usersCollection := services.GetMongoDBCollection(config.UsersCollection)
-	err := usersCollection.FindOne(ctx, bson.M{"_id": cliams.ID}).Decode(user)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
-		return
-	}
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
 	post := &models.Post{}
 	messages := helpers.ValidateRequestBody(c, post)
 	if messages != nil {
@@ -48,7 +32,18 @@ func CreatePost(c *gin.Context) {
 		return
 	}
 
-	post.NormalizeFields(user)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	findUserResult := models.FindUser(ctx, bson.M{"_id": cliams.ID})
+	if findUserResult.User == nil {
+		c.JSON(findUserResult.StatusCode, findUserResult.StatusCode)
+		return
+	}
+
+	user := findUserResult.User
+	post.NormalizeFields(user.ID)
+
 	keys := post.GeneratePresignedURLKeys()
 	urls, err := services.GeneratePresignedURLs(keys)
 	if err != nil {
@@ -65,9 +60,11 @@ func CreatePost(c *gin.Context) {
 
 	postDocuments := models.MapPostsToUserSubDocuments(*post)
 	update := bson.M{
-		"$push": bson.M{"posts": bson.M{"$each": postDocuments, "$position": 0, "$slice": config.PostsLengthInUserDocument}},
-		"$inc":  bson.M{"postCount": 1},
+		"$push": bson.M{"posts": bson.M{"$each": postDocuments, "$position": 0, "$slice": config.CommonPaginationLength}},
+		"$inc":  bson.M{"postsCount": 1},
 	}
+
+	usersCollection := services.GetMongoDBCollection(config.UsersCollection)
 	_, err = usersCollection.UpdateByID(ctx, user.ID, update)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -85,246 +82,178 @@ func DeletePost(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	postIdParamValue := c.Param("_id")
+	postId, err := primitive.ObjectIDFromHex(postIdParamValue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid postId", postIdParamValue)})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	user := &models.User{}
-	usersCollection := services.GetMongoDBCollection(config.UsersCollection)
-	opts := &options.FindOneOptions{
-		Projection: bson.M{"posts": 1, "postCount": 1},
-	}
-	err := usersCollection.FindOne(ctx, bson.M{"_id": cliams.ID}, opts).Decode(user)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
+	findOneOptions := options.FindOne().SetProjection(bson.M{"posts": 1, "postsCount": 1})
+	findUserResult := models.FindUser(ctx, bson.M{"_id": cliams.ID}, findOneOptions)
+	if findUserResult.User == nil {
+		c.JSON(findUserResult.StatusCode, findUserResult.ResponseBody)
 		return
 	}
 
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+	findOneOptions = options.FindOne().SetProjection(bson.M{"userId": 1})
+	findPostResult := models.FindPost(ctx, bson.M{"_id": postId}, findOneOptions)
+	if findPostResult.Post == nil {
+		c.JSON(findPostResult.StatusCode, findPostResult.ResponseBody)
 		return
 	}
 
-	postId, err := primitive.ObjectIDFromHex(c.Param("_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid postId"})
-		return
-	}
-
-	post := &models.Post{}
-	postsCollection := services.GetMongoDBCollection(config.PostsCollection)
-	filter := bson.M{"_id": postId}
-	opts = &options.FindOneOptions{
-		Projection: bson.M{"userId": 1},
-	}
-	err = postsCollection.FindOne(ctx, filter, opts).Decode(post)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		c.JSON(http.StatusNotFound, gin.H{"message": "Post not found"})
-		return
-	}
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	if post.UserID != user.ID {
+	if findPostResult.Post.UserID != cliams.ID {
 		c.JSON(http.StatusForbidden, gin.H{"message": "You cannot delete this post"})
 		return
 	}
 
-	deleteResult, err := postsCollection.DeleteOne(ctx, filter)
-	if deleteResult.DeletedCount == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"message": "Post not found"})
-		return
-	}
-
+	session, err := services.GetMongoDBSession()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
+	defer session.EndSession(ctx)
 
-	update := bson.M{
-		"$pull": bson.M{"posts": bson.M{"_id": postId}},
-		"$inc":  bson.M{"postCount": -1},
-	}
-	_, err = usersCollection.UpdateByID(ctx, user.ID, update)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	if user.PostCount > 12 {
-		recentPost := bson.M{}
-		postIds := user.GetPostIds()
-		filter = bson.M{"_id": bson.M{"$nin": postIds}}
-		opts = &options.FindOneOptions{
-			Projection: bson.M{"images": 1, "likeCount": 1, "commentCount": 1},
-			Sort:       bson.M{"createdAt": -1},
-		}
-		err := postsCollection.FindOne(ctx, filter, opts).Decode(&recentPost)
-		if !errors.Is(err, mongo.ErrNoDocuments) && err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			return
-		}
-
-		update = bson.M{"$push": bson.M{"posts": bson.M{"$each": bson.A{recentPost}, "$sort": bson.M{"createdAt": -1}}}}
-		_, err = usersCollection.UpdateByID(ctx, user.ID, update)
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		repliesCollection := services.GetMongoDBCollection(config.RepliesCollection)
+		_, err := repliesCollection.DeleteMany(sessCtx, bson.M{"postId": postId})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			return
+			return nil, err
 		}
+
+		commentsCollection := services.GetMongoDBCollection(config.CommentsCollection)
+		_, err = commentsCollection.DeleteMany(sessCtx, bson.M{"postId": postId})
+		if err != nil {
+			return nil, err
+		}
+
+		postsCollection := services.GetMongoDBCollection(config.PostsCollection)
+		_, err = postsCollection.DeleteOne(sessCtx, bson.M{"_id": postId})
+		if err != nil {
+			return nil, err
+		}
+
+		user := findUserResult.User
+		update := bson.M{
+			"$pull": bson.M{"posts": bson.M{"_id": postId}},
+			"$inc":  bson.M{"postsCount": -1},
+		}
+		usersCollection := services.GetMongoDBCollection(config.UsersCollection)
+		_, err = usersCollection.UpdateByID(sessCtx, user.ID, update)
+		if err != nil {
+			return nil, err
+		}
+
+		if user.PostsCount > config.CommonPaginationLength {
+			recentPost := bson.M{}
+			filter := bson.M{"_id": bson.M{"$nin": user.GetPostIds()}, "userId": user.ID}
+			findOneOptions := options.FindOne().SetProjection(bson.M{"images": 1, "likesCount": 1, "commentsCount": 1})
+			findOneOptions.SetSort(bson.M{"createdAt": -1})
+
+			err := postsCollection.FindOne(sessCtx, filter, findOneOptions).Decode(&recentPost)
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				return nil, nil
+			}
+
+			if err != nil {
+				return nil, err
+			}
+
+			update = bson.M{"$push": bson.M{"posts": recentPost}}
+			_, err = usersCollection.UpdateByID(sessCtx, user.ID, update)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return nil, nil
+	}
+
+	_, err = session.WithTransaction(ctx, callback)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Success"})
 }
 
 func GetPost(c *gin.Context) {
-	postId, err := primitive.ObjectIDFromHex(c.Param("_id"))
+	postIdParamValue := c.Param("_id")
+	postId, err := primitive.ObjectIDFromHex(postIdParamValue)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid postId"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid postId", postIdParamValue)})
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	post := &models.Post{}
-	collection := services.GetMongoDBCollection(config.PostsCollection)
-	err = collection.FindOne(ctx, bson.M{"_id": postId}).Decode(post)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		c.JSON(http.StatusNotFound, gin.H{"message": "Post not found"})
+	findPostResult := models.FindPost(ctx, bson.M{"_id": postId})
+	if findPostResult.Post == nil {
+		c.JSON(findPostResult.StatusCode, findPostResult.ResponseBody)
 		return
 	}
 
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+	post := findPostResult.Post
+
+	findUserResult := models.FindUser(ctx, bson.M{"_id": post.UserID})
+	if findUserResult.User == nil {
+		c.JSON(findUserResult.StatusCode, findUserResult.ResponseBody)
 		return
 	}
 
-	user := &models.User{}
-	collection = services.GetMongoDBCollection(config.UsersCollection)
-	err = collection.FindOne(ctx, bson.M{"_id": post.UserID}).Decode(user)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
-		return
-	}
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	post.SetUser(user)
-	c.JSON(http.StatusOK, post)
+	post.SetUser(findUserResult.User)
+	c.JSON(http.StatusOK, bson.M{"post": post})
 }
 
-func GetPosts(c *gin.Context) {
-	username := c.Query("username")
-
-	switch {
-	case c.Query("postId") != "":
-		GetUserSimilarPosts(c)
-	case username != "":
-		GetUserProfilePosts(c)
-	default:
-		GetUserHomePosts(c)
-	}
-
-}
-
-func GetUserHomePosts(c *gin.Context) {
-	value, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Please provide a valid token"})
-		return
-	}
-
-	cliams, ok := value.(*services.AccessTokenClaim)
+func SavePost(c *gin.Context) {
+	cliams, ok := c.MustGet("user").(*services.AccessTokenClaim)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Please provide a valid token"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Could not parse decoded token"})
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	user := &models.User{}
-	usersCollection := services.GetMongoDBCollection(config.UsersCollection)
-	err := usersCollection.FindOne(ctx, bson.M{"_id": cliams.ID}).Decode(user)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		c.JSON(http.StatusNotFound, "User not found")
+	postIdParamValue := c.Param("_id")
+	postId, err := primitive.ObjectIDFromHex(postIdParamValue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid postId", postIdParamValue)})
 		return
 	}
 
-	c.JSON(200, "ehll")
-}
-
-func GetUserSimilarPosts(c *gin.Context) {
-	c.JSON(200, "ehll")
-}
-
-func GetUserProfilePosts(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	filter := bson.M{"username": c.Query("username")}
-	findOneOptions := &options.FindOneOptions{
-		Projection: bson.M{"username": 1, "image": 1},
-	}
-	user := &models.User{}
-	usersCollection := services.GetMongoDBCollection(config.UsersCollection)
-	err := usersCollection.FindOne(ctx, filter, findOneOptions).Decode(user)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
+	findOneOptions := options.FindOne().SetProjection(bson.M{"_id": 1})
+	findUserResult := models.FindUser(ctx, bson.M{"_id": cliams.ID}, findOneOptions)
+	if findUserResult.User == nil {
+		c.JSON(findUserResult.StatusCode, findUserResult.ResponseBody)
 		return
 	}
 
+	findPostResult := models.FindPost(ctx, bson.M{"_id": postId})
+	if findPostResult.Post == nil {
+		c.JSON(findPostResult.StatusCode, findPostResult.ResponseBody)
+		return
+	}
+
+	update := bson.M{
+		"$push":        bson.M{"savedPosts": bson.M{"$each": bson.A{postId}, "$position": 0}},
+		"$inc":         bson.M{"savedPostsCount": 1},
+		"$setOnInsert": models.NewUserDetails(bson.A{"savedPosts", "savedPostsCount"}),
+	}
+	filter := bson.M{"userId": cliams.ID, "savedPostsCount": bson.M{"$lt": config.LargePaginationLength}}
+
+	userDetailsCollection := services.GetMongoDBCollection(config.UserDetailsCollection)
+	_, err = userDetailsCollection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	limitQueryValue := c.Query("limit")
-	limit := int64(config.PostsLengthInUserDocument)
-	if limitQueryValue != "" {
-		limit, err = strconv.ParseInt(limitQueryValue, 10, 0)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-			return
-		}
-	}
-
-	skipQueryValue := c.Query("skip")
-	skip := int64(0)
-	if skipQueryValue != "" {
-		skip, err = strconv.ParseInt(skipQueryValue, 10, 0)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-			return
-		}
-	}
-
-	filter = bson.M{"userId": user.ID}
-	findOptions := &options.FindOptions{
-		Limit:      &limit,
-		Projection: bson.M{"images": 1, "likeCount": 1, "commentCount": 1, "createdAt": 1},
-		Skip:       &skip,
-		Sort:       bson.M{"createdAt": -1},
-	}
-	postsCollection := services.GetMongoDBCollection(config.PostsCollection)
-	cursor, err := postsCollection.Find(ctx, filter, findOptions)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	posts := []models.Post{}
-	err = cursor.All(ctx, &posts)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-
-	postDocuments := models.MapPostsToUserSubDocuments(posts...)
-	c.JSON(http.StatusOK, postDocuments)
+	c.JSON(http.StatusOK, gin.H{"message": "Success"})
 }

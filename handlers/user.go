@@ -131,16 +131,14 @@ func GetUserHomePosts(c *gin.Context) {
 	usersPipeline := bson.A{usersLookupStage, usersUnWindStage, usersProjectStage}
 
 	pipeline := append(postsPipeline, usersPipeline...)
-	// This pipeline may likely exceed memory limit
-	aggregateOptions := options.Aggregate().SetAllowDiskUse(true)
 	userDetailsCollection := services.GetMongoDBCollection(config.UserDetailsCollection)
-	cursor, err := userDetailsCollection.Aggregate(ctx, pipeline, aggregateOptions)
+	cursor, err := userDetailsCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	posts := []models.Post{}
+	posts := []bson.M{}
 	err = cursor.All(ctx, &posts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -154,15 +152,14 @@ func GetUserProfilePosts(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	filter := bson.M{"username": c.Param("username")}
-	findOneOptions := &options.FindOneOptions{
-		Projection: bson.M{"username": 1, "image": 1, "postsCount": 1},
-	}
-	findUserResult := models.FindUser(ctx, filter, findOneOptions)
+	findOneOptions := options.FindOne().SetProjection(bson.M{"postsCount": 1})
+	findUserResult := models.FindUser(ctx, bson.M{"username": c.Param("username")}, findOneOptions)
 	if findUserResult.User == nil {
 		c.JSON(findUserResult.StatusCode, findUserResult.ResponseBody)
 		return
 	}
+
+	user := findUserResult.User
 
 	var err error
 	limitQueryValue := c.Query("limit")
@@ -185,15 +182,11 @@ func GetUserProfilePosts(c *gin.Context) {
 		}
 	}
 
-	filter = bson.M{"userId": findUserResult.User.ID}
-	findOptions := &options.FindOptions{
-		Limit:      &limit,
-		Projection: models.PostProjection,
-		Skip:       &skip,
-		Sort:       bson.M{"createdAt": -1},
-	}
+	findOptions := options.Find().SetProjection(models.PostProjection).SetSort(bson.M{"createdAt": -1})
+	findOptions = findOptions.SetSkip(skip).SetLimit(limit)
+
 	postsCollection := services.GetMongoDBCollection(config.PostsCollection)
-	cursor, err := postsCollection.Find(ctx, filter, findOptions)
+	cursor, err := postsCollection.Find(ctx, bson.M{"userId": user.ID}, findOptions)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
@@ -206,7 +199,7 @@ func GetUserProfilePosts(c *gin.Context) {
 		return
 	}
 
-	hasNextPage := (limit + skip) < int64(findUserResult.User.PostsCount)
+	hasNextPage := (limit + skip) < int64(user.PostsCount)
 	c.JSON(http.StatusOK, gin.H{"posts": posts, "hasNextPage": hasNextPage})
 }
 
