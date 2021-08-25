@@ -1,6 +1,11 @@
 package helpers
 
-import "reflect"
+import (
+	"reflect"
+	"strings"
+
+	"go.mongodb.org/mongo-driver/bson"
+)
 
 func GetMapKeys(object interface{}) []string {
 	reflectValue := reflect.ValueOf(object)
@@ -34,4 +39,18 @@ func GetMapValues(object interface{}) []interface{} {
 	}
 
 	return values
+}
+
+func GetStructFields(value interface{}, exclude bson.A) bson.A {
+	reflectionType := reflect.TypeOf(value)
+
+	fields := bson.A{}
+	for i := 0; i < reflectionType.NumField(); i++ {
+		field := strings.Split(reflectionType.Field(i).Tag.Get("json"), ",")[0]
+		if !Contains(exclude, field) {
+			fields = append(fields, field)
+		}
+	}
+
+	return fields
 }

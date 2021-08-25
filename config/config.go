@@ -35,7 +35,7 @@ var (
 func init() {
 	filename := ""
 	if IsTesting {
-		filename = "/home/kenzy/tutorial-projects/go-blog-api/.env.test"
+		filename = "../../.env.test"
 	}
 
 	if IsDevelopment {

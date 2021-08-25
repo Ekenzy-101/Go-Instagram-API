@@ -87,10 +87,10 @@ func (suite *LoginTestSuite) Test_Login_Succeeds() {
 		log.Fatal(err)
 	}
 
-	subset := []string{"_id", "name", "email"}
+	exclude := bson.A{"password", "gender", "phoneNo"}
 
 	suite.Equal(http.StatusOK, response.Code)
-	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
+	suite.Subset(helpers.GetStructFields(models.User{}, exclude), helpers.GetMapKeys(suite.ResponseBody))
 	suite.Contains(response.Result().Header, "Set-Cookie")
 }
 
@@ -103,7 +103,7 @@ func (suite *LoginTestSuite) Test_Login_FailsWithInvalidInputs() {
 		log.Fatal(err)
 	}
 
-	subset := []string{"email", "password"}
+	subset := bson.A{"email", "password"}
 
 	suite.Equal(http.StatusBadRequest, response.Code)
 	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)

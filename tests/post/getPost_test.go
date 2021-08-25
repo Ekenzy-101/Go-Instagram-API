@@ -82,8 +82,14 @@ func (suite *GetPostTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, err
 }
 
 func (suite *GetPostTestSuite) TearDownTest() {
-	suite.PostsCollection.DeleteMany(context.Background(), bson.M{})
-	suite.UsersCollection.DeleteMany(context.Background(), bson.M{})
+	_, err := suite.PostsCollection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = suite.UsersCollection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (suite *GetPostTestSuite) Test_GetPost_Succeeds() {
@@ -92,9 +98,10 @@ func (suite *GetPostTestSuite) Test_GetPost_Succeeds() {
 		log.Fatal(err)
 	}
 
-	subset := []string{"_id", "caption", "commentCount", "createdAt", "images", "likeCount", "location", "user"}
+	subset := helpers.GetStructFields(models.Post{}, bson.A{"userId", "imageCount"})
+
 	suite.Equal(response.Code, http.StatusOK)
-	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
+	suite.Subset(helpers.GetMapKeys(suite.ResponseBody["post"]), subset)
 }
 
 func (suite *GetPostTestSuite) Test_GetPost_FailsIfPostIdIsInvalid() {

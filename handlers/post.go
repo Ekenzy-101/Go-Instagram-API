@@ -37,7 +37,7 @@ func CreatePost(c *gin.Context) {
 
 	findUserResult := models.FindUser(ctx, bson.M{"_id": cliams.ID})
 	if findUserResult.User == nil {
-		c.JSON(findUserResult.StatusCode, findUserResult.StatusCode)
+		c.JSON(findUserResult.StatusCode, findUserResult.ResponseBody)
 		return
 	}
 

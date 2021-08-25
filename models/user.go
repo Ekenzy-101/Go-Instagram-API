@@ -30,22 +30,22 @@ type PasswordConfig struct {
 }
 
 type User struct {
-	ID              interface{} `bson:"_id,omitempty"  json:"_id,omitempty"`
-	AccountVerified bool        `bson:"accountVerified" json:"accountVerified"`
-	Bio             string      `bson:"bio" json:"bio"`
-	CreatedAt       time.Time   `bson:"createdAt" json:"createdAt,omitempty"`
-	Email           string      `bson:"email" json:"email,omitempty" binding:"email,max=255"`
-	FollowersCount  int         `bson:"followersCount" json:"followersCount"`
-	FollowingCount  int         `bson:"followingCount" json:"followingCount"`
-	Gender          string      `bson:"gender" json:"gender,omitempty"`
-	Image           string      `bson:"image" json:"image"`
-	Name            string      `bson:"name" json:"name" binding:"required,name,max=50"`
-	Password        string      `bson:"password" json:"password,omitempty"  binding:"required,min=6"`
-	PostsCount      int         `bson:"postsCount" json:"postsCount"`
-	Posts           []bson.M    `bson:"posts" json:"posts"`
-	PhoneNo         string      `bson:"phoneNo" json:"phoneNo,omitempty"`
-	Username        string      `bson:"username" json:"username" binding:"username"`
-	Website         string      `bson:"website" json:"website"`
+	ID              primitive.ObjectID `bson:"_id,omitempty"  json:"_id,omitempty"`
+	AccountVerified bool               `bson:"accountVerified" json:"accountVerified"`
+	Bio             string             `bson:"bio" json:"bio"`
+	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt,omitempty"`
+	Email           string             `bson:"email" json:"email,omitempty" binding:"email,max=255"`
+	FollowersCount  int                `bson:"followersCount" json:"followersCount"`
+	FollowingCount  int                `bson:"followingCount" json:"followingCount"`
+	Gender          string             `bson:"gender" json:"gender,omitempty"`
+	Image           string             `bson:"image" json:"image"`
+	Name            string             `bson:"name" json:"name" binding:"required,name,max=50"`
+	Password        string             `bson:"password" json:"password,omitempty"  binding:"required,min=6"`
+	PostsCount      int                `bson:"postsCount" json:"postsCount"`
+	Posts           []bson.M           `bson:"posts" json:"posts"`
+	PhoneNo         string             `bson:"phoneNo" json:"phoneNo,omitempty"`
+	Username        string             `bson:"username" json:"username" binding:"username"`
+	Website         string             `bson:"website" json:"website"`
 }
 
 func (user *User) ComparePassword(password string) (bool, error) {
@@ -89,7 +89,7 @@ func (user *User) GetPostIds() bson.A {
 func (user *User) GenerateAccessToken() (string, error) {
 	claims := &services.AccessTokenClaim{
 		Email: user.Email,
-		ID:    user.ID.(primitive.ObjectID),
+		ID:    user.ID,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Local().Add(time.Second * config.AccessTokenTTLInSeconds).Unix(),
 		},

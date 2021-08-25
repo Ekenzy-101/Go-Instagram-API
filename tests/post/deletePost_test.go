@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
-	"github.com/Ekenzy-101/Go-Gin-REST-API/models"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/mocks"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/routes"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/stretchr/testify/suite"
@@ -20,56 +20,37 @@ import (
 
 type DeletePostTestSuite struct {
 	suite.Suite
-	InvalidID       string
-	PostID          primitive.ObjectID
-	PostsCollection *mongo.Collection
-	ResponseBody    bson.M
-	Token           string
-	UserID          primitive.ObjectID
-	UsersCollection *mongo.Collection
+	CommentsCollection *mongo.Collection
+	InvalidID          string
+	PostID             primitive.ObjectID
+	PostsCollection    *mongo.Collection
+	ResponseBody       bson.M
+	RepliesCollection  *mongo.Collection
+	Token              string
+	UserID             primitive.ObjectID
+	UsersCollection    *mongo.Collection
 }
 
 func (suite *DeletePostTestSuite) SetupSuite() {
 	services.CreateMongoDBConnection()
+	suite.CommentsCollection = services.GetMongoDBCollection(config.CommentsCollection)
+	suite.RepliesCollection = services.GetMongoDBCollection(config.RepliesCollection)
 	suite.PostsCollection = services.GetMongoDBCollection(config.PostsCollection)
 	suite.UsersCollection = services.GetMongoDBCollection(config.UsersCollection)
 }
 
 func (suite *DeletePostTestSuite) SetupTest() {
 	suite.ResponseBody = bson.M{}
-	suite.PostID = primitive.NewObjectID()
-	suite.UserID = primitive.NewObjectID()
 	suite.InvalidID = ""
 
-	post := models.Post{
-		ID:       suite.PostID,
-		Location: "Test",
-		Caption:  "Test",
-		Images:   []string{},
-		UserID:   suite.UserID,
-	}
-	_, err := suite.PostsCollection.InsertOne(context.Background(), post)
+	result, err := mocks.DeletePost()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	user := models.User{
-		ID:       suite.UserID,
-		Email:    "test@gmail.com",
-		Username: "testuser",
-		Posts: []bson.M{{
-			"_id": suite.PostID,
-		}},
-	}
-	_, err = suite.UsersCollection.InsertOne(context.Background(), user)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	suite.Token, err = user.GenerateAccessToken()
-	if err != nil {
-		log.Fatal(err)
-	}
+	suite.PostID = result.PostID
+	suite.UserID = result.UserID
+	suite.Token = result.Token
 }
 
 func (suite *DeletePostTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, error) {
@@ -91,8 +72,25 @@ func (suite *DeletePostTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, 
 }
 
 func (suite *DeletePostTestSuite) TearDownTest() {
-	suite.PostsCollection.DeleteMany(context.Background(), bson.M{})
-	suite.UsersCollection.DeleteMany(context.Background(), bson.M{})
+	_, err := suite.CommentsCollection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = suite.PostsCollection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = suite.RepliesCollection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = suite.UsersCollection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (suite *DeletePostTestSuite) Test_DeletePost_Succeeds() {
@@ -100,6 +98,18 @@ func (suite *DeletePostTestSuite) Test_DeletePost_Succeeds() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	err = suite.CommentsCollection.FindOne(context.Background(), bson.M{"postId": suite.PostID}).Err()
+	suite.ErrorIs(err, mongo.ErrNoDocuments)
+
+	err = suite.RepliesCollection.FindOne(context.Background(), bson.M{"postId": suite.PostID}).Err()
+	suite.ErrorIs(err, mongo.ErrNoDocuments)
+
+	err = suite.PostsCollection.FindOne(context.Background(), bson.M{"_id": suite.PostID}).Err()
+	suite.ErrorIs(err, mongo.ErrNoDocuments)
+
+	err = suite.UsersCollection.FindOne(context.Background(), bson.M{"_id": suite.UserID, "posts": bson.M{"$size": 0}}).Err()
+	suite.NoError(err)
 
 	suite.Equal(http.StatusOK, response.Code)
 	suite.Contains(suite.ResponseBody, "message")

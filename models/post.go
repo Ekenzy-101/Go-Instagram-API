@@ -111,8 +111,8 @@ func FindPost(ctx context.Context, filter interface{}, options ...*options.FindO
 	}
 }
 
-func MapPostsToUserSubDocuments(posts ...Post) bson.A {
-	postDocuments := make(bson.A, len(posts))
+func MapPostsToUserSubDocuments(posts ...Post) []bson.M {
+	postDocuments := make([]bson.M, len(posts))
 
 	for index, post := range posts {
 		postDocument := bson.M{

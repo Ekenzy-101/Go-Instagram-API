@@ -11,6 +11,7 @@ import (
 
 	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/helpers"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/mocks"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/models"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/routes"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
@@ -21,10 +22,10 @@ import (
 )
 
 type CreatePostResponseBody struct {
-	Post       *models.Post `json:"post"`
-	URLs       []string     `json:"urls"`
-	Message    string       `json:"message"`
-	ImageCount string       `json:"imageCount"`
+	Post       bson.M   `json:"post"`
+	URLs       []string `json:"urls"`
+	Message    string   `json:"message"`
+	ImageCount string   `json:"imageCount"`
 }
 
 type CreatePostTestSuite struct {
@@ -33,7 +34,6 @@ type CreatePostTestSuite struct {
 	ResponseBody    CreatePostResponseBody
 	Token           string
 	PostsCollection *mongo.Collection
-	UserID          primitive.ObjectID
 	UsersCollection *mongo.Collection
 }
 
@@ -45,24 +45,14 @@ func (suite *CreatePostTestSuite) SetupSuite() {
 
 func (suite *CreatePostTestSuite) SetupTest() {
 	suite.ImageCount = 2
-	suite.UserID = primitive.NewObjectID()
 	suite.ResponseBody = CreatePostResponseBody{}
 
-	user := models.User{
-		ID:       suite.UserID,
-		Email:    "test@gmail.com",
-		Username: "testuser",
-		Posts:    []bson.M{},
-	}
-	_, err := suite.UsersCollection.InsertOne(context.Background(), user)
+	result, err := mocks.CreatePost()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	suite.Token, err = user.GenerateAccessToken()
-	if err != nil {
-		log.Fatal(err)
-	}
+	suite.Token = result.Token
 }
 
 func (suite *CreatePostTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, error) {
@@ -90,8 +80,15 @@ func (suite *CreatePostTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, 
 }
 
 func (suite *CreatePostTestSuite) TearDownTest() {
-	suite.UsersCollection.DeleteMany(context.Background(), bson.M{})
-	suite.PostsCollection.DeleteMany(context.Background(), bson.M{})
+	_, err := suite.UsersCollection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = suite.PostsCollection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (suite *CreatePostTestSuite) Test_CreatePost_Succeeds() {
@@ -100,12 +97,17 @@ func (suite *CreatePostTestSuite) Test_CreatePost_Succeeds() {
 		log.Fatal(err)
 	}
 
-	responseBody := suite.ResponseBody
-	list := []interface{}{"", "testuser"}
+	filter := bson.M{"email": "test@gmail.com", "posts.0.images": bson.M{"$size": suite.ImageCount}}
+	err = suite.UsersCollection.FindOne(context.Background(), filter).Err()
 
+	exclude := bson.A{"userId", "imageCount"}
+	responseBody := suite.ResponseBody
+
+	suite.NoError(err)
 	suite.Equal(response.Code, http.StatusCreated)
 	suite.Equal(len(responseBody.URLs), suite.ImageCount)
-	suite.Subset(list, helpers.GetMapValues(responseBody.Post.User))
+	suite.Subset(helpers.GetStructFields(models.Post{}, exclude), helpers.GetMapKeys(responseBody.Post))
+	suite.Subset(bson.A{"", "testuser"}, helpers.GetMapValues(responseBody.Post["user"]))
 }
 
 func (suite *CreatePostTestSuite) Test_CreatePost_FailsWithInvalidInputs() {
@@ -135,8 +137,11 @@ func (suite *CreatePostTestSuite) Test_CreatePost_FailsIfUserIsNotLoggedIn() {
 	suite.Equal(response.Code, http.StatusUnauthorized)
 	suite.NotEmpty(responseBody.Message)
 }
+
 func (suite *CreatePostTestSuite) Test_CreatePost_FailsIfUserNotFound() {
-	deleteResult, err := suite.UsersCollection.DeleteOne(context.Background(), bson.M{"_id": suite.UserID})
+	var err error
+	user := &models.User{ID: primitive.NewObjectID()}
+	suite.Token, err = user.GenerateAccessToken()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -149,7 +154,6 @@ func (suite *CreatePostTestSuite) Test_CreatePost_FailsIfUserNotFound() {
 	responseBody := suite.ResponseBody
 
 	suite.Equal(response.Code, http.StatusNotFound)
-	suite.NotEmpty(deleteResult.DeletedCount)
 	suite.NotEmpty(responseBody.Message)
 }
 

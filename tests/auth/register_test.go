@@ -72,7 +72,10 @@ func (suite *RegisterTestSuite) ExecuteRequest() (*httptest.ResponseRecorder, er
 }
 
 func (suite *RegisterTestSuite) TearDownTest() {
-	suite.UsersCollection.DeleteMany(context.Background(), bson.M{})
+	_, err := suite.UsersCollection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (suite *RegisterTestSuite) Test_Register_Succeeds() {
@@ -81,10 +84,10 @@ func (suite *RegisterTestSuite) Test_Register_Succeeds() {
 		log.Fatal(err)
 	}
 
-	subset := []string{"_id", "name", "email", "username", "followerCount", "followingCount", "postCount"}
+	exclude := bson.A{"password", "gender", "phoneNo"}
 
 	suite.Equal(http.StatusCreated, response.Code)
-	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
+	suite.Subset(helpers.GetStructFields(models.User{}, exclude), helpers.GetMapKeys(suite.ResponseBody))
 	suite.Contains(response.Result().Header, "Set-Cookie")
 }
 
@@ -99,7 +102,7 @@ func (suite *RegisterTestSuite) Test_Register_FailsWithInvalidInputs() {
 		log.Fatal(err)
 	}
 
-	subset := []string{"password", "name", "email", "username"}
+	subset := bson.A{"password", "name", "email", "username"}
 
 	suite.Equal(http.StatusBadRequest, response.Code)
 	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
