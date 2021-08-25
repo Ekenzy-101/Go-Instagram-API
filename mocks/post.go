@@ -98,3 +98,35 @@ func DeletePost() (*PostRouteMockResult, error) {
 	}
 	return result, nil
 }
+
+func SavePost() (*PostRouteMockResult, error) {
+	post := models.Post{Caption: "Test", ID: primitive.NewObjectID()}
+	postsCollection := services.GetMongoDBCollection(config.PostsCollection)
+	_, err := postsCollection.InsertOne(context.Background(), post)
+	if err != nil {
+		return nil, err
+	}
+
+	user := models.User{
+		ID:       primitive.NewObjectID(),
+		Email:    "test@gmail.com",
+		Username: "testuser",
+	}
+	usersCollection := services.GetMongoDBCollection(config.UsersCollection)
+	_, err = usersCollection.InsertOne(context.Background(), user)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := user.GenerateAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	result := &PostRouteMockResult{
+		Token:  token,
+		UserID: user.ID,
+		PostID: post.ID,
+	}
+	return result, nil
+}

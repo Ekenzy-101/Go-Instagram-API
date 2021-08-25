@@ -81,7 +81,7 @@ func (suite *LoginTestSuite) TearDownTest() {
 	}
 }
 
-func (suite *LoginTestSuite) Test_Login_Succeeds() {
+func (suite *LoginTestSuite) Test_Succeeds() {
 	response, err := suite.ExecuteRequest()
 	if err != nil {
 		log.Fatal(err)
@@ -94,7 +94,7 @@ func (suite *LoginTestSuite) Test_Login_Succeeds() {
 	suite.Contains(response.Result().Header, "Set-Cookie")
 }
 
-func (suite *LoginTestSuite) Test_Login_FailsWithInvalidInputs() {
+func (suite *LoginTestSuite) Test_FailsWithInvalidInputs() {
 	suite.Email = strings.Join(make([]string, 247), "a") + "@gmail.com"
 	suite.Password = "111"
 
@@ -109,7 +109,7 @@ func (suite *LoginTestSuite) Test_Login_FailsWithInvalidInputs() {
 	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
 }
 
-func (suite *LoginTestSuite) Test_Login_FailsIfUserDoesNotExistInDatabase() {
+func (suite *LoginTestSuite) Test_FailsIfUserDoesNotExistInDatabase() {
 	suite.Email = "doesnotexist@gmail.com"
 
 	response, err := suite.ExecuteRequest()
@@ -121,7 +121,7 @@ func (suite *LoginTestSuite) Test_Login_FailsIfUserDoesNotExistInDatabase() {
 	suite.Contains(suite.ResponseBody, "message")
 }
 
-func (suite *LoginTestSuite) Test_Login_FailsIfPasswordDoesNotMatch() {
+func (suite *LoginTestSuite) Test_FailsIfPasswordDoesNotMatch() {
 	suite.Password = "notmatch"
 
 	response, err := suite.ExecuteRequest()

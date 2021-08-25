@@ -91,7 +91,7 @@ func (suite *CreatePostTestSuite) TearDownTest() {
 	}
 }
 
-func (suite *CreatePostTestSuite) Test_CreatePost_Succeeds() {
+func (suite *CreatePostTestSuite) Test_Succeeds() {
 	response, err := suite.ExecuteRequest()
 	if err != nil {
 		log.Fatal(err)
@@ -110,7 +110,7 @@ func (suite *CreatePostTestSuite) Test_CreatePost_Succeeds() {
 	suite.Subset(bson.A{"", "testuser"}, helpers.GetMapValues(responseBody.Post["user"]))
 }
 
-func (suite *CreatePostTestSuite) Test_CreatePost_FailsWithInvalidInputs() {
+func (suite *CreatePostTestSuite) Test_FailsWithInvalidInputs() {
 	suite.ImageCount = 0
 
 	response, err := suite.ExecuteRequest()
@@ -124,7 +124,7 @@ func (suite *CreatePostTestSuite) Test_CreatePost_FailsWithInvalidInputs() {
 	suite.NotEmpty(responseBody.ImageCount)
 }
 
-func (suite *CreatePostTestSuite) Test_CreatePost_FailsIfUserIsNotLoggedIn() {
+func (suite *CreatePostTestSuite) Test_FailsIfUserIsNotLoggedIn() {
 	suite.Token = ""
 
 	response, err := suite.ExecuteRequest()
@@ -138,7 +138,7 @@ func (suite *CreatePostTestSuite) Test_CreatePost_FailsIfUserIsNotLoggedIn() {
 	suite.NotEmpty(responseBody.Message)
 }
 
-func (suite *CreatePostTestSuite) Test_CreatePost_FailsIfUserNotFound() {
+func (suite *CreatePostTestSuite) Test_FailsIfUserNotFound() {
 	var err error
 	user := &models.User{ID: primitive.NewObjectID()}
 	suite.Token, err = user.GenerateAccessToken()

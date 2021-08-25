@@ -241,15 +241,16 @@ func SavePost(c *gin.Context) {
 		return
 	}
 
+	filter := bson.M{"userId": cliams.ID, "savedPostsCount": bson.M{"$lt": config.LargePaginationLength}}
 	update := bson.M{
 		"$push":        bson.M{"savedPosts": bson.M{"$each": bson.A{postId}, "$position": 0}},
 		"$inc":         bson.M{"savedPostsCount": 1},
 		"$setOnInsert": models.NewUserDetails(bson.A{"savedPosts", "savedPostsCount"}),
 	}
-	filter := bson.M{"userId": cliams.ID, "savedPostsCount": bson.M{"$lt": config.LargePaginationLength}}
+	updateOptions := options.Update().SetUpsert(true)
 
 	userDetailsCollection := services.GetMongoDBCollection(config.UserDetailsCollection)
-	_, err = userDetailsCollection.UpdateOne(ctx, filter, update)
+	_, err = userDetailsCollection.UpdateOne(ctx, filter, update, updateOptions)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return

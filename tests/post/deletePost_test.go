@@ -93,7 +93,7 @@ func (suite *DeletePostTestSuite) TearDownTest() {
 	}
 }
 
-func (suite *DeletePostTestSuite) Test_DeletePost_Succeeds() {
+func (suite *DeletePostTestSuite) Test_Succeeds() {
 	response, err := suite.ExecuteRequest()
 	if err != nil {
 		log.Fatal(err)
@@ -115,7 +115,7 @@ func (suite *DeletePostTestSuite) Test_DeletePost_Succeeds() {
 	suite.Contains(suite.ResponseBody, "message")
 }
 
-func (suite *DeletePostTestSuite) Test_DeletePost_FailsIfPostIdIsInvalid() {
+func (suite *DeletePostTestSuite) Test_FailsIfPostIdIsInvalid() {
 	suite.InvalidID = "invalid"
 
 	response, err := suite.ExecuteRequest()
@@ -127,7 +127,7 @@ func (suite *DeletePostTestSuite) Test_DeletePost_FailsIfPostIdIsInvalid() {
 	suite.Contains(suite.ResponseBody, "message")
 }
 
-func (suite *DeletePostTestSuite) Test_DeletePost_FailsIfPostNotFound() {
+func (suite *DeletePostTestSuite) Test_FailsIfPostNotFound() {
 	suite.PostID = primitive.NewObjectID()
 
 	response, err := suite.ExecuteRequest()
@@ -139,7 +139,7 @@ func (suite *DeletePostTestSuite) Test_DeletePost_FailsIfPostNotFound() {
 	suite.Contains(suite.ResponseBody, "message")
 }
 
-func (suite *DeletePostTestSuite) Test_DeletePost_FailsIfUserNotFound() {
+func (suite *DeletePostTestSuite) Test_FailsIfUserNotFound() {
 	_, err := suite.UsersCollection.DeleteOne(context.Background(), bson.M{"_id": suite.UserID})
 	if err != nil {
 		log.Fatal(err)
@@ -154,7 +154,7 @@ func (suite *DeletePostTestSuite) Test_DeletePost_FailsIfUserNotFound() {
 	suite.Contains(suite.ResponseBody, "message")
 }
 
-func (suite *DeletePostTestSuite) Test_DeletePost_FailsIfUserNotLoggedIn() {
+func (suite *DeletePostTestSuite) Test_FailsIfUserNotLoggedIn() {
 	suite.Token = ""
 
 	response, err := suite.ExecuteRequest()
@@ -166,7 +166,7 @@ func (suite *DeletePostTestSuite) Test_DeletePost_FailsIfUserNotLoggedIn() {
 	suite.Contains(suite.ResponseBody, "message")
 }
 
-func (suite *DeletePostTestSuite) Test_DeletePost_FailsIfUserNotOwnerOfPost() {
+func (suite *DeletePostTestSuite) Test_FailsIfUserNotOwnerOfPost() {
 	_, err := suite.PostsCollection.UpdateByID(context.Background(), suite.PostID, bson.M{"$set": bson.M{"userId": primitive.NewObjectID()}})
 	if err != nil {
 		log.Fatal(err)

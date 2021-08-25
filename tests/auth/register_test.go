@@ -78,7 +78,7 @@ func (suite *RegisterTestSuite) TearDownTest() {
 	}
 }
 
-func (suite *RegisterTestSuite) Test_Register_Succeeds() {
+func (suite *RegisterTestSuite) Test_Succeeds() {
 	response, err := suite.ExecuteRequest()
 	if err != nil {
 		log.Fatal(err)
@@ -91,7 +91,7 @@ func (suite *RegisterTestSuite) Test_Register_Succeeds() {
 	suite.Contains(response.Result().Header, "Set-Cookie")
 }
 
-func (suite *RegisterTestSuite) Test_Register_FailsWithInvalidInputs() {
+func (suite *RegisterTestSuite) Test_FailsWithInvalidInputs() {
 	suite.Email = strings.Repeat("a", 247) + "@gmail.com"
 	suite.Password = "111"
 	suite.Name = ""
@@ -108,7 +108,7 @@ func (suite *RegisterTestSuite) Test_Register_FailsWithInvalidInputs() {
 	suite.Subset(helpers.GetMapKeys(suite.ResponseBody), subset)
 }
 
-func (suite *RegisterTestSuite) Test_Register_FailsIfEmailExistsInDatabase() {
+func (suite *RegisterTestSuite) Test_FailsIfEmailExistsInDatabase() {
 	user := models.User{
 		Name:     suite.Name,
 		Email:    suite.Email,
@@ -129,7 +129,7 @@ func (suite *RegisterTestSuite) Test_Register_FailsIfEmailExistsInDatabase() {
 	suite.Equal(http.StatusBadRequest, response.Code)
 	suite.Contains(suite.ResponseBody["message"], "email")
 }
-func (suite *RegisterTestSuite) Test_Register_FailsIfUsernameExistsInDatabase() {
+func (suite *RegisterTestSuite) Test_FailsIfUsernameExistsInDatabase() {
 	user := models.User{
 		Name:     suite.Name,
 		Email:    "anotheremail@gmail.com",

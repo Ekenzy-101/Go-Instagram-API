@@ -92,7 +92,7 @@ func (suite *GetPostTestSuite) TearDownTest() {
 	}
 }
 
-func (suite *GetPostTestSuite) Test_GetPost_Succeeds() {
+func (suite *GetPostTestSuite) Test_Succeeds() {
 	response, err := suite.ExecuteRequest()
 	if err != nil {
 		log.Fatal(err)
@@ -104,7 +104,7 @@ func (suite *GetPostTestSuite) Test_GetPost_Succeeds() {
 	suite.Subset(helpers.GetMapKeys(suite.ResponseBody["post"]), subset)
 }
 
-func (suite *GetPostTestSuite) Test_GetPost_FailsIfPostIdIsInvalid() {
+func (suite *GetPostTestSuite) Test_FailsIfPostIdIsInvalid() {
 	suite.InvalidID = "invalid"
 
 	response, err := suite.ExecuteRequest()
@@ -116,7 +116,7 @@ func (suite *GetPostTestSuite) Test_GetPost_FailsIfPostIdIsInvalid() {
 	suite.Contains(suite.ResponseBody, "message")
 }
 
-func (suite *GetPostTestSuite) Test_GetPost_FailsIfPostNotFound() {
+func (suite *GetPostTestSuite) Test_FailsIfPostNotFound() {
 	suite.PostID = primitive.NewObjectID()
 
 	response, err := suite.ExecuteRequest()
@@ -128,7 +128,7 @@ func (suite *GetPostTestSuite) Test_GetPost_FailsIfPostNotFound() {
 	suite.Contains(suite.ResponseBody, "message")
 }
 
-func (suite *GetPostTestSuite) Test_GetPost_FailsIfUserNotFound() {
+func (suite *GetPostTestSuite) Test_FailsIfUserNotFound() {
 	_, err := suite.UsersCollection.DeleteOne(context.Background(), bson.M{"_id": suite.UserID})
 	if err != nil {
 		log.Fatal(err)
