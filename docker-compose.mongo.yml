@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  mongo1:
+    container_name: mongo1
+    image: mongo:4.4.6
+    networks:
+      - go-instagram
+    ports:
+      - 27017:27017
+    restart: always
+    command: --replSet rs0
+
+  mongo2:
+    container_name: mongo2
+    image: mongo:4.4.6
+    networks:
+      - go-instagram
+    ports:
+      - 27018:27017
+    restart: always
+    command: --replSet rs0
+
+  mongo3:
+    container_name: mongo3
+    image: mongo:4.4.6
+    networks:
+      - go-instagram
+    ports:
+      - 27019:27017
+    restart: always
+    command: --replSet rs0
+
+networks:
+  go-instagram:
+    name: go-instagram
+    driver: bridge
