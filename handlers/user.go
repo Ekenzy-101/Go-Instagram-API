@@ -20,7 +20,7 @@ func GetUser(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
-	findOneOptions := options.FindOne().SetProjection(bson.M{"password": 0, "email": 0})
+	findOneOptions := options.FindOne().SetProjection(bson.M{"password": 0, "email": 0, "gender": 0, "phoneNo": 0})
 	result := models.FindUser(ctx, bson.M{"username": c.Param("username")}, findOneOptions)
 	if result.User == nil {
 		c.JSON(result.StatusCode, result.ResponseBody)
@@ -55,21 +55,21 @@ func GetUserHomePosts(c *gin.Context) {
 
 	var err error
 	limitQueryValue := c.Query("limit")
-	limit := config.CommonPaginationLength
+	limit := uint64(config.CommonPaginationLength)
 	if limitQueryValue != "" {
-		limit, err = strconv.Atoi(limitQueryValue)
+		limit, err = strconv.ParseUint(limitQueryValue, 10, 32)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid integer", limitQueryValue)})
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a positive integer", limitQueryValue)})
 			return
 		}
 	}
 
 	skipQueryValue := c.Query("skip")
-	skip := 0
+	skip := uint64(0)
 	if skipQueryValue != "" {
-		skip, err = strconv.Atoi(skipQueryValue)
+		skip, err = strconv.ParseUint(skipQueryValue, 10, 32)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid integer", skipQueryValue)})
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a positive integer", skipQueryValue)})
 			return
 		}
 	}

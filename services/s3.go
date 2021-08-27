@@ -22,7 +22,7 @@ func GeneratePresignedURLs(keys []string) ([]string, error) {
 		return nil, fmt.Errorf("length of urls should be at least 1")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	cfg, err := config.LoadDefaultConfig(ctx)
