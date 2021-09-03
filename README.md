@@ -57,3 +57,27 @@ var config = {
 
 - Setup a replica-set with or without docker or even remote.
 - Run `make test-integration` for integration tests
+
+### DEPLOYMENT
+
+## AWS ELASTICBEANSTALK (WITHOUT DOCKER)
+
+- Make sure to add Buildfile and Procfile to customize the default command
+- Add the necessary environmental variables in the .ebextensions folder
+
+### AWS ELASTICBEANSTALK USING Dockerfile
+
+- Add the necessary environmental variables in the .ebextensions folder
+- Use a single stage build to avoid deployment error
+
+### AWS ELASTICBEANSTALK USING Dockerrun.aws.json
+
+- Add the necessary environmental variables in the .ebextensions folder
+- Run `cp -r .ebextensions dockerrun` to copy .ebextensions into dockerrun folder
+- Run `zip -rD dockerrun.zip ./dockerrun/` to create zip folder
+- Add this configuration to deploy artifact
+
+```yaml
+deploy:
+  artifact: ./dockerrun.zip
+```
