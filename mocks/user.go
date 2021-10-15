@@ -27,13 +27,13 @@ func GetUserHomePosts() (string, error) {
 	userToFollow.NormalizeFields(true)
 
 	posts := bson.A{}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < userToFollow.PostsCount; i++ {
 		post := &models.Post{}
 		post.NormalizeFields(userToFollow.ID)
 		posts = append(posts, post)
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < authUser.PostsCount; i++ {
 		post := &models.Post{}
 		post.NormalizeFields(authUser.ID)
 		posts = append(posts, post)
@@ -64,4 +64,35 @@ func GetUserHomePosts() (string, error) {
 	}
 
 	return authUser.GenerateAccessToken()
+}
+
+func GetUserProfilePosts() (username string, err error) {
+	authUser := &models.User{
+		Email:      "test@gmail.com",
+		Username:   "testuser",
+		PostsCount: 4,
+	}
+	authUser.NormalizeFields(true)
+
+	posts := bson.A{}
+	for i := 0; i < authUser.PostsCount; i++ {
+		post := &models.Post{}
+		post.NormalizeFields(authUser.ID)
+		posts = append(posts, post)
+	}
+
+	postsCollection := services.GetMongoDBCollection(config.PostsCollection)
+	_, err = postsCollection.InsertMany(context.Background(), posts)
+	if err != nil {
+		return
+	}
+
+	usersCollection := services.GetMongoDBCollection(config.UsersCollection)
+	_, err = usersCollection.InsertOne(context.Background(), authUser)
+	if err != nil {
+		return
+	}
+
+	username = authUser.Username
+	return
 }

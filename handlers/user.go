@@ -163,9 +163,9 @@ func GetUserProfilePosts(c *gin.Context) {
 
 	var err error
 	limitQueryValue := c.Query("limit")
-	limit := int64(config.CommonPaginationLength)
+	limit := uint64(config.CommonPaginationLength)
 	if limitQueryValue != "" {
-		limit, err = strconv.ParseInt(limitQueryValue, 10, 0)
+		limit, err = strconv.ParseUint(limitQueryValue, 10, 32)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid integer", limitQueryValue)})
 			return
@@ -173,9 +173,9 @@ func GetUserProfilePosts(c *gin.Context) {
 	}
 
 	skipQueryValue := c.Query("skip")
-	skip := int64(0)
+	skip := uint64(0)
 	if skipQueryValue != "" {
-		skip, err = strconv.ParseInt(skipQueryValue, 10, 0)
+		skip, err = strconv.ParseUint(skipQueryValue, 10, 32)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid integer", skipQueryValue)})
 			return
@@ -183,7 +183,7 @@ func GetUserProfilePosts(c *gin.Context) {
 	}
 
 	findOptions := options.Find().SetProjection(models.PostProjection).SetSort(bson.M{"createdAt": -1})
-	findOptions = findOptions.SetSkip(skip).SetLimit(limit)
+	findOptions = findOptions.SetSkip(int64(skip)).SetLimit(int64(limit))
 
 	postsCollection := services.GetMongoDBCollection(config.PostsCollection)
 	cursor, err := postsCollection.Find(ctx, bson.M{"userId": user.ID}, findOptions)
@@ -199,7 +199,7 @@ func GetUserProfilePosts(c *gin.Context) {
 		return
 	}
 
-	hasNextPage := (limit + skip) < int64(user.PostsCount)
+	hasNextPage := int(limit+skip) < user.PostsCount
 	c.JSON(http.StatusOK, gin.H{"posts": posts, "hasNextPage": hasNextPage})
 }
 
@@ -221,9 +221,9 @@ func GetUserSavedPosts(c *gin.Context) {
 
 	var err error
 	limitQueryValue := c.Query("limit")
-	limit := config.CommonPaginationLength
+	limit := uint64(config.CommonPaginationLength)
 	if limitQueryValue != "" {
-		limit, err = strconv.Atoi(limitQueryValue)
+		limit, err = strconv.ParseUint(limitQueryValue, 10, 32)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid integer", limitQueryValue)})
 			return
@@ -231,9 +231,9 @@ func GetUserSavedPosts(c *gin.Context) {
 	}
 
 	skipQueryValue := c.Query("skip")
-	skip := 0
+	skip := uint64(0)
 	if skipQueryValue != "" {
-		skip, err = strconv.Atoi(skipQueryValue)
+		skip, err = strconv.ParseUint(skipQueryValue, 10, 32)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("%v is not a valid integer", skipQueryValue)})
 			return

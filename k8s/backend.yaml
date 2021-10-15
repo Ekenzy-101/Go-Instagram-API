@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: go-instagram-api
+          image: onyekabaekene/go-instagram-api
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
@@ -37,4 +37,4 @@ spec:
     - protocol: TCP
       port: 5000
       targetPort: 5000
-      # nodePort: 30000 Connecting externally
+      nodePort: 30000

@@ -11,3 +11,8 @@ services:
     ports:
       - 5000:5000
     restart: always
+
+networks:
+  go-instagram:
+    name: go-instagram
+    driver: bridge

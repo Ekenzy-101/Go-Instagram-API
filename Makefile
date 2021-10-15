@@ -1,3 +1,9 @@
+MONGOD-PIDS=$(shell pgrep mongod)
+
+stop-db:
+	kill -2 $(MONGOD-PIDS)
+	rm -f *.log*
+
 start:
 	go run .
 
