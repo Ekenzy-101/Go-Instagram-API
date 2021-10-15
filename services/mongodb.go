@@ -3,10 +3,11 @@ package services
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/helpers"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -20,22 +21,20 @@ func CreateMongoDBConnection() {
 	defer cancel()
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(config.MongoDBURI))
-	if err != nil {
-		log.Fatal(err)
-	}
+	helpers.ExitIfError(err)
 
-	if err := client.Ping(ctx, readpref.Primary()); err != nil {
-		log.Fatal(err)
-	}
+	helpers.ExitIfError(client.Ping(ctx, readpref.Primary()))
 
 	mongoClient = client
 	if !config.IsTesting {
 		fmt.Println("Successfully connected and pinged")
 	}
 
-	_, err = createIndexes(ctx)
-	if err != nil {
-		log.Println(err)
+	_, err = CreateMongoDBIndexes(ctx)
+	helpers.ExitIfError(err)
+
+	if config.IsTesting {
+		DeleteAllMongoDBDocuments()
 	}
 }
 
@@ -43,7 +42,7 @@ func CloseMongoDBConnection() error {
 	return mongoClient.Disconnect(context.TODO())
 }
 
-func createIndexes(ctx context.Context) ([]string, error) {
+func CreateMongoDBIndexes(ctx context.Context) ([]string, error) {
 	userModels := []mongo.IndexModel{{
 		Keys:    bsonx.Doc{{Key: "email", Value: bsonx.Int32(1)}},
 		Options: options.Index().SetUnique(true),
@@ -109,6 +108,34 @@ func GetMongoDBSession(opts ...*options.SessionOptions) (mongo.Session, error) {
 	return mongoClient.StartSession(opts...)
 }
 
+func GetMongoDBClient() *mongo.Client {
+	return mongoClient
+}
+
 func GetMongoDBCollection(name string, opts ...*options.CollectionOptions) *mongo.Collection {
 	return mongoClient.Database(config.MongoDBName).Collection(name, opts...)
+}
+
+func DeleteAllMongoDBDocuments() {
+	commentsCollection := GetMongoDBCollection(config.CommentsCollection)
+	_, err := commentsCollection.DeleteMany(context.Background(), bson.M{})
+	helpers.ExitIfError(err)
+
+	postsCollection := GetMongoDBCollection(config.PostsCollection)
+	_, err = postsCollection.DeleteMany(context.Background(), bson.M{})
+	helpers.ExitIfError(err)
+
+	repliesCollection := GetMongoDBCollection(config.RepliesCollection)
+	_, err = repliesCollection.DeleteMany(context.Background(), bson.M{})
+	helpers.ExitIfError(err)
+
+	usersCollection := GetMongoDBCollection(config.UsersCollection)
+	_, err = usersCollection.DeleteMany(context.Background(), bson.M{})
+	helpers.ExitIfError(err)
+
+	userDetailsCollection := GetMongoDBCollection(config.UserDetailsCollection)
+	_, err = userDetailsCollection.DeleteMany(context.Background(), bson.M{})
+	helpers.ExitIfError(err)
+
+	time.Sleep(1 * time.Second)
 }

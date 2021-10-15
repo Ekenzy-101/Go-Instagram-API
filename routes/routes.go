@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -8,9 +9,11 @@ import (
 	"github.com/Ekenzy-101/Go-Gin-REST-API/config"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/handlers"
 	"github.com/Ekenzy-101/Go-Gin-REST-API/helpers"
+	"github.com/Ekenzy-101/Go-Gin-REST-API/services"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 func SetupRouter() *gin.Engine {
@@ -28,6 +31,20 @@ func SetupRouter() *gin.Engine {
 
 	router.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": fmt.Sprintf("%v operation is not supported for resource %v", c.Request.Method, c.Request.URL.Path)})
+	})
+
+	router.GET("/healthcheck", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		client := services.GetMongoDBClient()
+		err := client.Ping(ctx, readpref.Primary())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Success"})
 	})
 
 	authRouter := router.Group("auth")
