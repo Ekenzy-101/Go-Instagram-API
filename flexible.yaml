@@ -1,0 +1,55 @@
+automatic_scaling:
+  min_num_instances: 1
+  max_num_instances: 8
+  cool_down_period_sec: 180
+  cpu_utilization:
+    target_utilization: 0.7
+  target_concurrent_requests: 100
+
+env: flex
+
+env_variables:
+  APP_ACCESS_SECRET: <EDIT>
+  AWS_ACCESS_KEY_ID: <EDIT>
+  AWS_BUCKET: <EDIT>
+  AWS_DEFAULT_REGION: <EDIT>
+  AWS_SECRET_ACCESS_KEY: <EDIT>
+  CLIENT_ORIGIN: <EDIT>
+  GIN_MODE: <EDIT>
+  MONGODB_URI: <EDIT>
+  MONGODB_NAME: <EDIT>
+
+# Confirms that your VM and docker container are running
+liveness_check:
+  path: "/healthcheck"
+  check_interval_sec: 30
+  timeout_sec: 7
+  failure_threshold: 3
+  success_threshold: 2
+  initial_delay_sec: 300
+
+# Confirms that your VM and docker container are ready to accept requests
+readiness_check:
+  path: "/healthcheck"
+  check_interval_sec: 10
+  timeout_sec: 7
+  failure_threshold: 3
+  success_threshold: 2
+  app_start_timeout_sec: 420
+
+# Custom VPC Network
+network:
+  name: test
+  subnetwork_name: us-east-1-public
+  forwarded_ports:
+    - 5000
+
+resources:
+  cpu: 2
+  memory_gb: 1.5
+  disk_size_gb: 10
+
+# As at the time of writing, flexible environment doesn't support go modules which is a pain for me
+runtime: custom
+
+service: flexible

@@ -1,0 +1,24 @@
+automatic_scaling:
+  min_instances: 0
+  max_instances: 100
+  min_pending_latency: 50ms
+  max_pending_latency: automatic
+  max_concurrent_requests: 50
+  target_cpu_utilization: 0.70
+
+env_variables:
+  APP_ACCESS_SECRET: <EDIT>
+  AWS_ACCESS_KEY_ID: <EDIT>
+  AWS_BUCKET: <EDIT>
+  AWS_DEFAULT_REGION: <EDIT>
+  AWS_SECRET_ACCESS_KEY: <EDIT>
+  CLIENT_ORIGIN: <EDIT>
+  GIN_MODE: <EDIT>
+  MONGODB_URI: <EDIT>
+  MONGODB_NAME: <EDIT>
+
+instance_class: F2
+
+runtime: go116
+
+service: standard
